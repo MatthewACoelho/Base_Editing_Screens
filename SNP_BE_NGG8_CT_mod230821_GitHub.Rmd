@@ -1,0 +1,752 @@
+---
+title: "IFNG8_NGG"
+author: "Matt Coelho"
+date: "07/06/2020"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# load packages
+library(tidyverse)
+library(reshape2)
+library(ggrepel)
+library(stringr)
+```
+
+```{r}
+# read in guides for JAK1 from WGE
+data <- as_tibble(read.csv("IFNG_NGG_lib.csv", stringsAsFactors = FALSE, header = TRUE))
+```
+
+```{r}
+# determine window for base editor (here is 4-9). This is lenient and includes guides with G mismatch at pos 1.
+data <-  mutate(data, window = ifelse(strand == "+", substr(seq, 4, 9), substr(seq, 15, 20)))
+
+# edit window (here C to T for CBE)
+data <-  mutate(data, edit = ifelse(strand == "+", str_replace_all(window, "C", "t"), str_replace_all(window, "G", "a")))
+
+# make mutant seq (optional making full mutant protospacer genotype)
+data <-  mutate(data, mutant = ifelse(strand == "+", paste0(substr(seq, 1, 3), edit, substr(seq, 10, 23)), paste0(substr(seq, 1, 14), edit, substr(seq, 21, 23))))
+```
+
+```{r}
+# give numbers of each gRNA_type in the library
+data %>% count(sgRNA_type)
+data %>% distinct() %>% nrow()
+```
+
+```{r}
+# add a FORWARD guide column (reverse reverse complement for - strand seq)
+# add 5' G for non-G starting guides. You can use this to ORDER GUIDE libraries (add appropriate Gibson cloning adapters)
+# get rid of PAM
+data <- mutate(data, guide = ifelse(strand == "+", substr(seq, 1, 20), substr(seq, 4, 23)))
+
+# complement
+data <- mutate(data, guide = ifelse(strand == "+", guide, str_replace_all(guide, "A", "t")))
+data <- mutate(data, guide = ifelse(strand == "+", guide, str_replace_all(guide, "T", "a")))
+data <- mutate(data, guide = ifelse(strand == "+", guide, str_replace_all(guide, "C", "g")))
+data <- mutate(data, guide = ifelse(strand == "+", guide, str_replace_all(guide, "G", "c")))
+data <- mutate(data, guide = str_to_upper(guide))
+
+# reverse
+data <- mutate(data, guide = ifelse(strand == "+", guide, paste0(substr(guide, 20, 20), substr(guide, 19, 19),substr(guide, 18, 18),substr(guide, 17, 17),substr(guide, 16, 16),substr(guide, 15, 15), substr(guide, 14, 14), substr(guide, 13, 13), substr(guide, 12, 12), substr(guide, 11, 11), substr(guide, 10, 10), substr(guide, 9, 9), substr(guide, 8, 8), substr(guide, 7, 7), substr(guide, 6, 6), substr(guide, 5, 5), substr(guide, 4, 4), substr(guide, 3, 3), substr(guide, 2, 2), substr(guide, 1, 1))))
+
+# add a G for the expression from U6 promtoter by replaceing the base at pos. 1 if, it is not a G
+data <- mutate(data, G_guide = ifelse(substr(guide, 1, 1) == "G", guide, paste0("G", substr(guide, 2, 20))))
+
+# primers
+# forward_primer
+data <- mutate(data, for_primer = paste0("CACC", G_guide))
+
+# reverse_primer
+data <- mutate(data, rev_primer = G_guide)
+data <- mutate(data, rev_primer = str_replace_all(rev_primer, "A", "t"))
+data <- mutate(data, rev_primer = str_replace_all(rev_primer, "T", "a"))
+data <- mutate(data, rev_primer = str_replace_all(rev_primer, "C", "g"))
+data <- mutate(data, rev_primer = str_replace_all(rev_primer, "G", "c"))
+data <- mutate(data, rev_primer = str_to_upper(rev_primer))
+
+data <- mutate(data, rev_primer = paste0(substr(rev_primer, 20, 20), substr(rev_primer, 19, 19),substr(rev_primer, 18, 18),substr(rev_primer, 17, 17),substr(rev_primer, 16, 16),substr(rev_primer, 15, 15), substr(rev_primer, 14, 14), substr(rev_primer, 13, 13), substr(rev_primer, 12, 12), substr(rev_primer, 11, 11), substr(rev_primer, 10, 10), substr(rev_primer, 9, 9), substr(rev_primer, 8, 8), substr(rev_primer, 7, 7), substr(rev_primer, 6, 6), substr(rev_primer, 5, 5), substr(rev_primer, 4, 4), substr(rev_primer, 3, 3), substr(rev_primer, 2, 2), substr(rev_primer, 1, 1)))
+
+data <- mutate(data, rev_primer = paste0("AAAC", rev_primer))
+```
+
+```{r}
+# read in raw gRNA reads counts
+raw_reads <- as_tibble(read.csv("raw_reads.csv", stringsAsFactors = FALSE, header = TRUE))
+raw_reads <- mutate(raw_reads, sgRNA_ID = as.character(sgRNA_ID))
+
+# compute RPM normalised values
+RPM <- function(x) ((x/sum(x) *1000000) + 1)
+average <- function(x,y) ((x + y) /2)
+L2FC <- function(x,y) (log2(x/y))
+raw_reads <- mutate_at(raw_reads, vars(matches("reads")), list(RPM = RPM))
+                    
+# compute average normalised gRNA
+raw_reads <- mutate(raw_reads, average_reads_T0_RPM = average(reads_T0_1_RPM, reads_T0_2_RPM))
+raw_reads <- mutate(raw_reads, average_reads_Control_prolif_RPM = average(reads_Control_prolif_1_RPM, reads_Control_prolif_1_RPM))
+raw_reads <- mutate(raw_reads, average_reads_Control_FACS_RPM = average(reads_Control_FACS_1_RPM, reads_Control_FACS_1_RPM))
+raw_reads <- mutate(raw_reads, average_reads_IFNg_prolif_RPM = average(reads_IFNg_prolif_1_RPM, reads_IFNg_prolif_1_RPM))
+raw_reads <- mutate(raw_reads, average_reads_IFNg_FACS_RPM = average(reads_IFNg_FACS_1_RPM, reads_IFNg_FACS_1_RPM))
+
+# compute L2FC normalised gRNA single experiments
+#exp.1
+raw_reads <- mutate(raw_reads, L2FC_Control_T0_1 = L2FC(reads_Control_prolif_1_RPM, reads_T0_1_RPM))
+raw_reads <- mutate(raw_reads, L2FC_IFNg_Control_prolif_1 = L2FC(reads_IFNg_prolif_1_RPM, reads_Control_prolif_1_RPM))
+raw_reads <- mutate(raw_reads, L2FC_IFNg_Control_FACS_1 = L2FC(reads_IFNg_FACS_1_RPM, reads_Control_FACS_1_RPM))
+#exp.2
+raw_reads <- mutate(raw_reads, L2FC_Control_T0_2 = L2FC(reads_Control_prolif_2_RPM, reads_T0_2_RPM))
+raw_reads <- mutate(raw_reads, L2FC_IFNg_Control_prolif_2 = L2FC(reads_IFNg_prolif_2_RPM, reads_Control_prolif_2_RPM))
+raw_reads <- mutate(raw_reads, L2FC_IFNg_Control_FACS_2 = L2FC(reads_IFNg_FACS_2_RPM, reads_Control_FACS_2_RPM))
+
+# compute L2FC normalised gRNA averages
+raw_reads <- mutate(raw_reads, L2FC_Control_T0 = L2FC(average_reads_Control_prolif_RPM, average_reads_T0_RPM))
+raw_reads <- mutate(raw_reads, L2FC_IFNg_Control_prolif = L2FC(average_reads_IFNg_prolif_RPM, average_reads_Control_prolif_RPM))
+raw_reads <- mutate(raw_reads, L2FC_IFNg_Control_FACS = L2FC(average_reads_IFNg_FACS_RPM, average_reads_Control_FACS_RPM))
+
+# join
+data <- left_join(data, raw_reads)
+
+# filter out smaples with < 100 reads
+
+data %>% filter(reads_Control_prolif_1 <100 | reads_Control_prolif_2 <100 | reads_IFNg_prolif_1 <100 | reads_IFNg_prolif_2 <100 | reads_Control_FACS_1 <100 | reads_Control_FACS_2 <100 | reads_IFNg_FACS_1 <100 | reads_IFNg_FACS_2 <100 )
+
+data <- data %>% filter(reads_Control_prolif_1 >100 & reads_Control_prolif_2 >100 & reads_IFNg_prolif_1 >100 & reads_IFNg_prolif_2 >100 & reads_Control_FACS_1 >100 & reads_Control_FACS_2 >100 & reads_IFNg_FACS_1 >100 & reads_IFNg_FACS_2 >100 )
+```
+
+```{r}
+# quality control plots
+plot1 <- ggplot(data, aes(y= reads_T0_1_RPM)) + 
+geom_histogram() +
+labs(title= "Reads T0 exp.1")
+plot1
+
+plot2 <- ggplot(data, aes(y= reads_T0_2_RPM)) + 
+geom_histogram() +
+labs(title= "Reads T0 exp.2")
+plot2
+
+plot3 <- ggplot(data, aes(y= average_reads_T0_RPM)) + 
+geom_histogram() +
+labs(title= "Reads T0 average")
+plot3
+
+plot4 <- ggplot(data, aes(x= L2FC_Control_T0_1, colour = sgRNA_type, fill = sgRNA_type)) + 
+geom_density(alpha = 0.1) +
+labs(title= "", x = "exp.1 L2FC: control vs T0 ") +
+theme_classic()
+plot4
+
+plot5 <- ggplot(data, aes(x= L2FC_Control_T0_2, colour = sgRNA_type, fill = sgRNA_type)) + 
+geom_density(alpha = 0.1) +
+labs(title= "", x = "exp.2 L2FC: control vs T0 ") +
+theme_classic()
+plot5
+
+plot6 <- ggplot(data, aes(x= L2FC_Control_T0, colour = sgRNA_type, fill = sgRNA_type)) + 
+geom_density(alpha = 0.1) +
+labs(title= "", x = "average L2FC: control vs T0") +
+theme_classic()
+plot6
+```
+
+```{r}
+# read in DrugZ z-scores
+z_scores <- as_tibble(read.csv("zscores_270821.csv", stringsAsFactors = FALSE, header = TRUE))
+data <- left_join(data, z_scores)
+```
+
+```{r}
+# zscores vs L2FC
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data, Gene %in% c("JAK1")), aes(x=L2FC_IFNg_Control_prolif, y= zscore_IFNG_Cntrl_prolif_average)) + geom_jitter(size=3, alpha=0.8, position = pos) +
+labs(title= "JAK1 NG gRNAs", x = "L2FC_IFNg_Control_prolif", y = "zscore_NG_IFNG_Cntrl_prolif_average") +
+scale_colour_manual(values=c("black", "orange", "grey65", "red2")) +
+theme_classic()
+plot1
+
+plot2 <- ggplot(subset(data, Gene %in% c("JAK1")), aes(x=L2FC_IFNg_Control_FACS, y= zscore_IFNG_Cntrl_FACS_average)) + geom_jitter(size=3, alpha=0.8, position = pos) +
+labs(title= "JAK1 NG gRNAs", x = "L2FC_IFNg_Control_prolif", y = "zscore_NG_IFNG_Cntrl_prolif_average") +
+scale_colour_manual(values=c("black", "orange", "grey65", "red2")) +
+theme_classic()
+plot2
+```
+
+```{r}
+# replicate correlation
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data, Gene %in% c("JAK1", "JAK2", "STAT1", "IRF1", "IFNGR1","IFNGR2", "B2M", "SOCS1")), aes(x=zscore_IFNG_Cntrl_prolif_1, y= zscore_IFNG_Cntrl_prolif_2, colour = zscore_IFNG_Cntrl_FACS_average)) + geom_jitter(size=3, alpha=0.8, position = pos) +
+labs(title= "all pathway gRNAs", x = "z-score: proliferation screen exp.1", y = "z-score: proliferation screen exp. 2", colour = "L2FC: FACS screens") +
+geom_smooth(method = lm) +
+theme_classic()
+plot1
+
+plot2 <- ggplot(subset(data, Gene %in% c("JAK1", "JAK2", "STAT1", "IRF1", "IFNGR1","IFNGR2", "B2M", "SOCS1")), aes(x=zscore_IFNG_Cntrl_FACS_1, y= zscore_IFNG_Cntrl_FACS_2, colour = zscore_IFNG_Cntrl_prolif_average)) + geom_jitter(size=3, alpha=0.8, position = pos) +
+labs(title= "all pathway gRNAs", x = "z-score: FACS screen exp.1", y = "z-score: FACS screen exp. 2", colour = "L2FC: FACS screens") +
+geom_smooth(method = lm) +
+theme_classic()
+plot2
+```
+
+```{r}
+# find positions of edits within the window
+data <-  mutate(data, VEP = ifelse(strand == "+", str_locate_all(mutant, pattern = "t"), str_locate_all(mutant, pattern = "a" )))
+
+# index the edits and clean up the syntax for numeric input only
+data <-  separate(data, VEP, remove = FALSE, into = c("first", "second", "third", "fourth", "fifth", "sixth", "extra"), sep = c("\\,"), extra = "merge")
+data <-  mutate(data, first =(str_replace(first, "integer", "")))
+data <-  mutate(data, first =(str_replace(first, "c", "")))
+data <-  mutate(data, first =(str_replace(first, "\\(", "")))
+data <-  mutate(data, first =(str_replace(first, "\\)", "")))
+data <-  mutate(data, second =(str_replace(second, "\\)", "")))
+data <-  mutate(data, third =(str_replace(third, "\\)", "")))
+data <-  mutate(data, fourth =(str_replace(fourth, "\\)", "")))
+data <-  mutate(data, fifth =(str_replace(fifth, "\\)", "")))
+data <-  mutate(data, sixth =(str_replace(sixth, "\\)", "")))
+```
+
+```{r}
+# make positions numeric to determine location from start
+data <-  mutate(data, first = as.numeric(first))
+data <-  mutate(data, second = as.numeric(second))
+data <-  mutate(data, third = as.numeric(third))
+data <-  mutate(data, fourth = as.numeric(fourth))
+data <-  mutate(data, fifth = as.numeric(fifth))
+data <-  mutate(data, sixth = as.numeric(sixth))
+data <-  mutate(data, start = as.numeric(start))
+
+# generate single VEP id window mutants 
+data <- mutate(data, mut1 = ifelse(strand == "+", paste(chr, (start + (first-1)), (start + (first-1)), "C/T", strand), paste(chr, (start+(first-1)), (start+(first-1)), "G/A", "+")))
+data <- mutate(data, mut1 = ifelse(first == "0" | first == "NA", "NA", mut1))
+
+data <- mutate(data, mut2 = ifelse(strand == "+", paste(chr, (start + (second-1)), (start + (second-1)), "C/T", strand), paste(chr, (start+(second-1)), (start+(second-1)), "G/A", "+")))
+data <- mutate(data, mut2 = ifelse(second == "NA" | second == first, "NA", mut2))
+
+data <- mutate(data, mut3 = ifelse(strand == "+", paste(chr, (start + (third-1)), (start + (third-1)), "C/T", strand), paste(chr, (start+ (third-1)), (start+ (third-1)), "G/A", "+")))
+data <- mutate(data, mut3 = ifelse(third == "NA" | third == first | third == second, "NA", mut3))
+
+data <- mutate(data, mut4 = ifelse(strand == "+", paste(chr, (start + (fourth-1)), (start + (fourth-1)), "C/T", strand), paste(chr, (start+ (fourth-1)), (start+ (fourth-1)), "G/A", "+")))
+data <- mutate(data, mut4 = ifelse(fourth == "NA" | fourth == first | fourth == second | fourth == third, "NA", mut4))
+
+data <- mutate(data, mut5 = ifelse(strand == "+", paste(chr, (start + (fifth-1)), (start + (fifth-1)), "C/T", strand), paste(chr, (start+ (fifth-1)), (start + (fifth-1)), "G/A", "+")))
+data <- mutate(data, mut5 = ifelse(fifth == "NA" | fifth == first | fifth == second | fifth == third | fifth == fourth, "NA", mut5))
+
+data <- mutate(data, mut6 = ifelse(strand == "+", paste(chr, (start + (sixth-1)), (start + (sixth-1)), "C/T", strand), paste(chr, (start+ (sixth-1)), (start + (sixth-1)), "G/A", "+")))
+data <- mutate(data, mut6 = ifelse(sixth == "NA" | sixth == first | sixth == second | sixth == third | sixth == fourth | sixth == fifth, "NA", mut6))
+
+# generate combined VEP id window mutants
+data <- mutate(data, combined_mut = ifelse(window != edit & strand == "+", paste0(chr, " ", (start+3), " ",(start+8), " ", window, "/", str_to_upper(edit), " ", "+"), "NA"))
+data <- mutate(data, combined_mut = ifelse(window != edit & strand == "-", paste0(chr, " ", (start+14), " ",(start+19), " ", window, "/", str_to_upper(edit), " ", "+"), combined_mut))
+
+# melt data and eliminate NA in VEP_id
+data <- melt(select(data, !c(VEP, extra)), measure.vars = c("mut1", "mut2", "mut3", "mut4", "mut5", "mut6", "combined_mut"), variable.name = "edit_index", value.name = "VEP_id")
+data <- mutate(data, VEP_id = str_replace_all(string = VEP_id, pattern  = "NA", replacement = ""))
+data <- mutate(data, VEP_id = str_replace_na(string = VEP_id, replacement = ""))
+
+# generate tsv output file
+data %>% filter(Gene %in% c("JAK1", "JAK2", "STAT1", "IRF1", "IFNGR1","IFNGR2", "B2M", "SOCS1")) %>% arrange(start) %>% select("VEP_id") %>% write_tsv("VEP_query.tsv")
+
+# Pass VEP_query.tsv to VEP ensembl and include only MANE results using online filter
+# Make a results file called VEP_results.csv
+# Change excel cells to numbers as it gives dates automatically which messes things up
+# Remove duplicate values for VEP_id entries before joining!
+# Get rid of unwanted data output columns in excel
+# you can replace commas in text editor before making the csv as this can include additional delimited columns in excel
+```
+
+```{r}
+# read in VEP results file
+VEP_results <- as_tibble(read.csv("VEP_results.csv", stringsAsFactors = FALSE, header = TRUE))
+VEP_results <- rename(VEP_results, Uploaded_variation = "X.Uploaded_variation")
+
+data <- separate(data, VEP_id, remove = TRUE, into = c("chr_edit", "start_edit", "end_edit", "edit_genotype", "extra_"), sep = c(" "), extra = "merge")
+```
+
+```{r}
+# make joining by query result compatible
+data <- mutate(data, Uploaded_variation = (paste0(chr_edit, "_", start_edit, "_", edit_genotype)))
+VEP_results <- rename(VEP_results, Gene_ID_VEP = Gene)
+
+# join VEP results to gRNA table
+data <- left_join(data, VEP_results)
+data <- data %>% select(!extra_)
+data <- data %>% select(!"first" & !"second" & !"third" & !"fourth" & !"fifth")
+```
+
+```{r}
+# split HGVSp output from VEP to give Amino_Acid_Position
+data <- separate(data, HGVSp, remove = FALSE, into = c("HGVSp1", "HGVSp2"), sep = c(":"), extra = "merge")
+
+data <- mutate(data, Amino_Acid_Position = substr(HGVSp2, 6, 50))
+data <- mutate(data, Amino_Acid_Position = ifelse(str_detect(Amino_Acid_Position, "%"), "synonymous", Amino_Acid_Position))
+data <- mutate(data, Amino_Acid_Position = ifelse(str_detect(Amino_Acid_Position, "\\?"), "1", Amino_Acid_Position))
+data <- mutate(data, Amino_Acid_Position = ifelse(str_detect(Amino_Acid_Position, "_"), "multiple edit", Amino_Acid_Position))
+data <- mutate(data, Amino_Acid_Position = ifelse(Consequence != "start_lost" & Amino_Acid_Position != "multiple edit" & Amino_Acid_Position != "synonymous", str_sub(Amino_Acid_Position, end = -4), Amino_Acid_Position))
+
+# alter names 
+data <- rename(data, Amino_Acid_Change = HGVSp2)
+```
+
+```{r}
+# define codon change
+substrRight <- function(x, n){
+  substr(x, nchar(x)-n+1, nchar(x))
+}
+
+data <- mutate(data, codon  = str_sub(Amino_Acid_Change,3,5))
+data <- mutate(data, new_codon  = substrRight(Amino_Acid_Change, 3))
+data <- mutate(data, new_codon = ifelse(new_codon == "%3D", codon, new_codon))
+data <- mutate(data, Codon_Change = paste0(codon, ">", new_codon)) 
+```
+
+```{r}
+# read in Master_JAK1_Protein_Mutations_Humans
+Mutations <- as_tibble(read.csv("Master_clinical_dataset_IFNG8NGG_090621.csv", stringsAsFactors = FALSE, header = TRUE))
+Mutations <- mutate(Mutations, Amino_Acid_Position = as.character(Amino_Acid_Position))
+
+# make COSMIC AA.Mutations into three letter code for compatibility
+Mutations <- mutate(Mutations, Clinical_Protein_Change_ThreeL = ifelse(Citation != "gnomAD_v3.1", str_replace_all(string = Clinical_Protein_Change, 
+                c("A" = "Ala",
+                  "R" = "Arg",
+                  "N" = "Asn",
+                  "D" = "Asp",
+                  "C" = "Cys",
+                  "G" = "Gly",
+                  "E" = "Glu",
+                  "Q" = "Gln",
+                  "H" = "His",
+                  "I" = "Ile",
+                  "L" = "Leu",
+                  "K" = "Lys",
+                  "M" = "Met",
+                  "P" = "Pro",
+                  "F" = "Phe",
+                  "S" = "Ser",
+                  "T" = "Thr",
+                  "W" = "Trp",
+                  "Y" = "Tyr",
+                  "V" = "Val",
+                  "\\*" = "Ter")), Clinical_Protein_Change))
+
+Mutations <- select(Mutations, !Clinical_Protein_Change)
+Mutations <- rename(Mutations, Clinical_Protein_Change = Clinical_Protein_Change_ThreeL)
+
+# clinical_outcomes.csv from clinical trial papers ovelapping with the IFNG8 or NG JAK1 VEP dataset
+clinical_outcomes <- as_tibble(read.csv("clinical_outcomes.csv", stringsAsFactors = FALSE, header = TRUE))
+
+Mutations <- left_join(Mutations, clinical_outcomes)
+
+data <- mutate(data, Amino_Acid_Position = as.character(Amino_Acid_Position))
+data <- left_join(data, Mutations)
+```
+
+```{r}
+# COSMIC_Count graph
+data <- mutate(data, COSMIC_Count = ifelse(is.na(COSMIC_Count) == TRUE, 0, COSMIC_Count))
+data_COSMIC_graph <- data %>%
+  filter(Gene %in% c("JAK1", "JAK2", "STAT1", "IRF1", "IFNGR1","IFNGR2", "B2M", "SOCS1") & Amino_Acid_Position != "synonymous" & Amino_Acid_Position != "multiple edit") %>%
+  select(COSMIC_Count, Amino_Acid_Position, sgRNA_ID, L2FC_IFNg_Control_prolif, Clinical_Protein_Change, Gene, SIFT) %>% 
+  distinct()
+data_COSMIC_graph <- mutate(data_COSMIC_graph, SIFT = as.numeric(SIFT))
+data_COSMIC_graph
+```
+
+```{r}
+# COSMIC_Count graph
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(data_COSMIC_graph, aes(x=COSMIC_Count, y= L2FC_IFNg_Control_prolif, size = SIFT)) +
+geom_jitter(alpha=0.7, position = pos, colour = ifelse(data_COSMIC_graph$L2FC_IFNg_Control_prolif >1 & data_COSMIC_graph$COSMIC_Count >0, "royalblue1", ifelse(data_COSMIC_graph$L2FC_IFNg_Control_prolif < -0.5 & data_COSMIC_graph$COSMIC_Count >0, "salmon","grey45"))) +
+labs(title= "JAK1 gRNAs, protein coding", x = "COSMIC Count", y = "L2FC: proliferation screen") +
+geom_hline(yintercept=c(1,1), linetype="dotted", colour = "royalblue1") +
+geom_hline(yintercept=c(0,0), linetype="dotted", colour = "grey45") +
+geom_hline(yintercept=c(-0.5,-0.5), linetype="dotted", colour = "salmon") +
+geom_text_repel(aes(label=ifelse(L2FC_IFNg_Control_prolif >1 & COSMIC_Count > 0 | L2FC_IFNg_Control_prolif < -0.9 & COSMIC_Count > 0, Clinical_Protein_Change, "")), size = 2, position = pos) +
+  facet_wrap(~Gene, scales = "free", nrow = 2) +
+  scale_size(range = c(2, 5)) +
+theme_classic()
+plot1
+```
+
+```{r}
+# write final output.csv file without filtering
+write_csv(data, "final.csv")
+```
+
+```{r}
+#graphical subset to reduce Amino_Acid_Position redundant duplicate plotting
+data_graphing <- data %>%
+  select(Amino_Acid_Position, Gene, sgRNA_ID, sgRNA_type, Consequence, chr, start, end, seq, PTM, Amino_Acid_Change, Clinical_Protein_Change, Citation, off_target_summary, L2FC_IFNg_Control_prolif, L2FC_IFNg_Control_FACS, zscore_IFNG_Cntrl_prolif_average,	zscore_IFNG_Cntrl_FACS_average,	zscore_T0_Cntrl_average,	zscore_IFNG_Cntrl_prolif_1,	zscore_IFNG_Cntrl_FACS_1, zscore_IFNG_Cntrl_prolif_2,	zscore_IFNG_Cntrl_FACS_2, Binarized_Clinical_Response) %>%
+  distinct()
+```
+
+```{r}
+# Rename Consequences
+
+data_graphing <- mutate(data_graphing, Consequence = ifelse(Consequence == "missense_variant", "missense", 
+                                                                              ifelse(Consequence == "missense_variant_splice_region_variant", "splice variant", 
+                                                                                     ifelse(Consequence == "splice_region_variant", "splice variant", 
+                                                                                            ifelse(Consequence == "stop_retained_variant", "synonymous",
+                                                                                                   ifelse(Consequence == "synonymous_variant", "synonymous", 
+                                                                                                          ifelse(Consequence == "splice_region_variant_synonymous_variant", "splice variant",
+                                                                                                                  ifelse(Consequence == "splice_acceptor_variant", "splice variant",
+                                                                                                                                                                           ifelse(Consequence == "stop_gained_splice_region_variant", "stop codon",
+                                                                                                                                                                                  ifelse(Consequence == "start_lost", "start lost",
+                                                                                                                                                                                         ifelse(Consequence == "stop_gained_start_lost", "stop codon",
+                                                                                                                                                                                                ifelse(Consequence == "upstream_gene_variant", "promoter",
+                                                                                                                                                                                                       ifelse(Consequence == "intron_variant", "promoter",
+                                                                                                                                                                                                        ifelse(Consequence == "5_prime_UTR_variant", "5'UTR",
+                                                                                                                                                                                  ifelse(Consequence == "stop_gained", "stop codon", Consequence))))))))))))))) %>% 
+  distinct()
+
+data_graphing
+```
+
+```{r}
+# Replace Amino_Acid_Position with numerical values, or synonymous, or multiple_edit
+
+data_graphing <- mutate(data_graphing, Amino_Acid_Position = str_remove(Amino_Acid_Position, "synonymous"), Amino_Acid_Position)
+data_graphing <- mutate(data_graphing, Amino_Acid_Position = str_remove(Amino_Acid_Position, "multiple edit"), Amino_Acid_Position)
+
+data_graphing <- mutate(data_graphing, Amino_Acid_Change = ifelse(Consequence == "synonymous", NA, Amino_Acid_Change))
+data_graphing <- mutate(data_graphing, Amino_Acid_Change = ifelse(str_detect(Amino_Acid_Change, "%") == TRUE, str_replace(Amino_Acid_Change, "%3D", substr(Amino_Acid_Change, 3, 5)), Amino_Acid_Change))
+
+data_graphing %>% group_by(sgRNA_ID) %>% select(sgRNA_ID, Consequence, Gene, Amino_Acid_Position, Amino_Acid_Change, Clinical_Protein_Change)
+```
+
+```{r}
+#filter data_graphing subset to get rid of duplicate values and summarise them into one row per gRNA
+
+Amino_Acid_Change <- data_graphing %>%
+  group_by(sgRNA_ID) %>%
+  filter(is.na(Amino_Acid_Change)==FALSE) %>%
+  distinct(Amino_Acid_Change) %>%
+  summarise(Amino_Acid_Change = paste(Amino_Acid_Change, collapse = ", "))
+
+Clinical_Protein_Change <- data_graphing %>%
+  group_by(sgRNA_ID) %>%
+  filter(is.na(Clinical_Protein_Change)==FALSE) %>%
+  distinct(Clinical_Protein_Change) %>%
+  summarise(Clinical_Protein_Change = paste(Clinical_Protein_Change, collapse = ", "))
+
+Citation <- data_graphing %>%
+  group_by(sgRNA_ID) %>%
+  filter(is.na(Citation)==FALSE) %>%
+  distinct(Citation) %>%
+  summarise(Citation = paste(Citation, collapse = ", "))
+
+PTM <- data_graphing %>%
+  group_by(sgRNA_ID) %>%
+  filter(is.na(PTM)==FALSE) %>%
+  distinct(PTM) %>%
+  summarise(PTM = paste(PTM, collapse = ", "))
+
+Consequence <- data_graphing %>%
+  group_by(sgRNA_ID) %>%
+  filter(is.na(Consequence)==FALSE) %>%
+  distinct(Consequence) %>%
+  summarise(Consequence = paste(Consequence, collapse = ", "))
+
+Binarized_Clinical_Response <- data_graphing %>%
+  group_by(sgRNA_ID) %>%
+  filter(is.na(Binarized_Clinical_Response)==FALSE) %>%
+  distinct(Binarized_Clinical_Response) %>%
+  summarise(Binarized_Clinical_Response = paste(Binarized_Clinical_Response, collapse = ", "))
+
+Amino_Acid_Position <- data_graphing %>%
+  group_by(sgRNA_ID) %>%
+  filter(is.na(Amino_Acid_Position)==FALSE) %>%
+  distinct(Amino_Acid_Position) %>%
+  summarise(Amino_Acid_Position = paste(Amino_Acid_Position, collapse = " "))
+
+data_graphing_filtered <- select(data_graphing, !c(Amino_Acid_Change, Clinical_Protein_Change, Citation, PTM, Consequence, Binarized_Clinical_Response, Amino_Acid_Position)) 
+
+data_graphing_filtered <- left_join(data_graphing_filtered, Amino_Acid_Change) %>% distinct()
+data_graphing_filtered <- left_join(data_graphing_filtered, Clinical_Protein_Change) %>% distinct()
+data_graphing_filtered <- left_join(data_graphing_filtered, Citation) %>% distinct()
+data_graphing_filtered <- left_join(data_graphing_filtered, PTM) %>% distinct()
+data_graphing_filtered <- left_join(data_graphing_filtered, Consequence) %>% distinct()
+data_graphing_filtered <- left_join(data_graphing_filtered, Binarized_Clinical_Response) %>% distinct()
+data_graphing_filtered <- left_join(data_graphing_filtered, Amino_Acid_Position) %>% distinct()
+
+data_graphing_filtered
+```
+
+```{r}
+# Resolve multiple consequences for one amino acid position by severity
+
+data_graphing_filtered <- mutate(data_graphing_filtered, Consequence = ifelse(str_detect(Consequence, "stop codon"), "stop codon",
+                                                                                         ifelse(str_detect(Consequence, "start lost"), "start lost", 
+                                                                                                           ifelse(str_detect(Consequence, "splice variant"), "splice variant",
+                                                                                                                   ifelse(str_detect(Consequence, "missense"), "missense",
+                                                                                                                  ifelse(str_detect(Consequence, "UTR"), "UTR",
+                                                                                                                         ifelse(str_detect(Consequence, "synonymous"), "synonymous",
+                                                                                                                         Consequence)))))))
+
+data_graphing_filtered %>% group_by(sgRNA_ID) %>% select(sgRNA_ID, Consequence, Gene, Amino_Acid_Position, sgRNA_type)
+```
+```{r}
+# Make a simplified such that we can plot on a numerical scale
+
+data_graphing_filtered <- mutate(data_graphing_filtered, Amino_Acid_Change = str_remove_all(Amino_Acid_Change, "p\\."))
+data_graphing_filtered <- mutate(data_graphing_filtered, Clinical_Protein_Change = str_remove_all(Clinical_Protein_Change, "p\\."))
+
+
+data_graphing_filtered <- mutate(data_graphing_filtered, Amino_Acid_Position_simple = Amino_Acid_Position)
+data_graphing_filtered <- mutate(data_graphing_filtered, Amino_Acid_Position_simple = as.numeric(str_extract(Amino_Acid_Position_simple, "[[:digit:]]+")))
+
+data_graphing_filtered %>% select(Amino_Acid_Position, Amino_Acid_Position_simple, Amino_Acid_Change, Clinical_Protein_Change, Consequence)
+
+```
+
+```{r}
+# check protein_hits L2FC for Emile with missense (VUS)
+data_graphing_filtered %>% 
+  filter(L2FC_IFNg_Control_prolif >0.9 & L2FC_IFNg_Control_FACS >1.5 & Gene %in% c("JAK1", "JAK2", "STAT1", "IRF1", "IFNGR1", "IFNGR2", "B2M", "SOCS1") | L2FC_IFNg_Control_FACS >1.5 & Gene == "B2M") %>% 
+  distinct() %>%
+    write.csv("protein_hits_NGG_IFNG8.csv")
+```
+
+```{r}
+# for labelling validation cohort on graphs
+
+data_graphing_filtered <- mutate(data_graphing_filtered, validation_cohort = ifelse(sgRNA_ID %in% c("908523459", "908523616", "908514537", "908514536", "908509432", "908510622", "908509431", "908510623", "908508937", "908509672", "908509010", "908512440", "908510034", "908510164", "908509007", "908510033", "908510274", "908509428", "908510028", "908510170", "908510032", "908508944", "908508948", "908510162"), "validated gRNAs", "putative"))
+
+# removing amino acid positions not covered (NA)
+
+data_graphing_filtered <- data_graphing_filtered %>% 
+  arrange(Amino_Acid_Position) %>%
+  group_by(Gene) %>%
+   filter(!is.na(Amino_Acid_Position)) %>%
+            distinct()
+
+data_graphing_filtered
+```
+
+```{r}
+# zscore and L2FC correlation and cut-off graphs
+
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+plot1 <- ggplot(subset(data_graphing_filtered, Gene %in% c("JAK1", "JAK2", "STAT1", "IRF1", "IFNGR1", "IFNGR2", "B2M", "SOCS1")), aes(x= zscore_IFNG_Cntrl_prolif_average, y = zscore_IFNG_Cntrl_FACS_average, shape = validation_cohort, colour = Consequence)) +
+scale_shape_manual(values=c(16, 8)) +
+scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
+geom_point(alpha = 0.7, position = pos, size = 3) +
+labs(title= "variant positions of concern", x = "z-score: proliferation screen", y = "z-score: FACS screen", shape = " ") +
+geom_vline(xintercept=c(3, 3),linetype="dotted") +
+geom_vline(xintercept=c(-3, -3),linetype="dotted", colour = "salmon") +
+geom_hline(yintercept=c(3, 3),linetype="dotted") +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
+  facet_wrap(~Gene, nrow = 2) +
+theme_classic()
+plot1
+```
+
+```{r}
+# dot plots _ proliferation - facet
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(data_graphing_filtered, aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
+geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
+labs(title= "BE edit prediction (C>T): - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+facet_wrap(~Gene, scales = "free", nrow = 2) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
+theme_classic()
+plot1
+```
+
+```{r}
+# dot plots _ proliferation - JAK1 (1)
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, Gene == "JAK1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
+geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
+labs(title= "JAK1 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Cntrl_prolif_average < -3 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
+theme_classic()
+plot1
+```
+
+```{r}
+# dot plots _ proliferation - JAK2 (1)
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, Gene == "JAK2"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
+geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
+labs(title= "JAK2 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Cntrl_prolif_average < -3 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
+theme_classic()
+plot1
+```
+
+```{r}
+# dot plots _ proliferation - IFNGR1 (1)
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, Gene == "IFNGR1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
+geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
+labs(title= "IFNGR1 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Cntrl_prolif_average < -3 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
+theme_classic()
+plot1
+```
+
+```{r}
+# dot plots _ proliferation - IFNGR2 (1)
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, Gene == "IFNGR2"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
+geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
+labs(title= "IFNGR2 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Cntrl_prolif_average < -3 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
+theme_classic()
+plot1
+```
+
+```{r}
+# dot plots _ proliferation - STAT1 (1)
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, Gene == "STAT1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
+geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
+labs(title= "STAT1 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Cntrl_prolif_average < -3 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
+theme_classic()
+plot1
+```
+
+```{r}
+# dot plots _ proliferation - IRF1 (1)
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, Gene == "IRF1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
+geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
+labs(title= "IRF1 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Cntrl_prolif_average < -3 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
+theme_classic()
+plot1
+```
+
+```{r}
+# dot plots _ proliferation - SOCS1 (1)
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, Gene == "SOCS1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
+geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
+labs(title= "SOCS1 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Cntrl_prolif_average < -3 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
+theme_classic()
+plot1
+```
+
+```{r}
+# dot plots _ proliferation - B2M (1)
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, Gene == "B2M"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
+geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
+labs(title= "B2M - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Cntrl_prolif_average < -3 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
+theme_classic()
+plot1
+```
+
+```{r}
+# read in guides for JAK1 from WGE
+zscores_JAK1 <- as_tibble(read.csv("160321_JAK1_zscores.csv", stringsAsFactors = FALSE, header = TRUE))
+data_graphing_filtered <-left_join(data_graphing_filtered, zscores_JAK1)
+```
+
+```{r}
+# zscore and L2FC correlation and cut-offs
+
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(data_graphing_filtered, aes(x=zscore_IFNG_Proliferation_Average, y= zscore_IFNG_FACS_Average)) + 
+geom_point(size=3, alpha=0.7, position = pos, shape = 16, colour = ifelse(data_graphing_filtered$zscore_IFNG_Proliferation_Average < -2.5, "salmon", ifelse(data_graphing_filtered$zscore_IFNG_Proliferation_Average > 5 & data_graphing_filtered$zscore_IFNG_FACS_Average > 5, "royalblue1", "grey45"))) +
+labs(title= "JAK1 amino acids", x = "z-score: proliferation screen", y = "z-score: FACS screen") +
+geom_vline(xintercept=c(5,5),linetype="dotted") +
+geom_hline(yintercept=c(5,5),linetype="dotted") +
+geom_vline(xintercept=c(-2.5,-2.5),linetype="dotted", colour = "salmon") +
+geom_text_repel(aes(label=ifelse(sgRNA_ID %in% c("908523459", "908523616", "908514537", "908514536", "908509432", "908510622", "908509431", "908510623", "908508937", "908509672", "908509010", "908512440", "908510034", "908510164", "908509007", "908510033", "908510274", "908509428", "908510028", "908510170", "908510032", "908508944", "908508948", "908510162") & Amino_Acid_Position !="multiple edit" & Amino_Acid_Position !="synonymous", Amino_Acid_Position, "")), size = 3, position = pos) +
+theme_classic()
+plot1
+```
+
+```{r}
+# dot plots JAK1 NGG screen
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, Gene =="JAK1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Proliferation_Average, colour = Consequence)) + 
+geom_point(size=3, alpha=0.85, position = pos, shape = 16) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Proliferation_Average >5 & PTM != "NA" | zscore_IFNG_Proliferation_Average < -2.5 & PTM != "NA", PTM, "")), size = 3, position = pos) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Proliferation_Average >5  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Proliferation_Average < -2.5 & Clinical_Protein_Change != "NA" & Consequence == "missense"| validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
+labs(title= "BE edit prediction (C>T): JAK1 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "red2", "grey65")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+theme_classic()
+plot1
+
+plot2 <- ggplot(subset(data_graphing_filtered, Gene =="JAK1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_FACS_Average, colour = Consequence)) + 
+geom_point(size=3, alpha=0.85, position = pos, shape = 16) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_FACS_Average >5 & PTM != "NA" | zscore_IFNG_FACS_Average < -2.5 & PTM != "NA", PTM, "")), size = 3, position = pos) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_FACS_Average >5  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_FACS_Average < -2.5 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
+labs(title= "BE edit prediction (C>T): JAK1 - FACS screen", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "red2", "grey65")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+theme_classic()
+plot2
+
+data_graphing_filtered
+```
+
+```{r}
+# check protein_hits L2FC with missense (VUS) - IFNG8 NGG LOF
+missense_hits_IFNG8_NGG_LOF <- data_graphing_filtered %>% 
+  filter(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Gene %in% c("JAK1", "JAK2", "STAT1", "IRF1", "IFNGR1","IFNGR2", "B2M", "SOCS1") & Consequence == "missense" | zscore_IFNG_Proliferation_Average >5 & zscore_IFNG_FACS_Average >5 & Gene %in% c("JAK1") & Consequence == "missense") %>% 
+  distinct()
+
+missense_hits_IFNG8_NGG_LOF
+
+write.csv(missense_hits_IFNG8_NGG_LOF, "protein_missense_hits_IFNG8_NGG_LOF.csv")
+```
+```{r}
+# check protein_hits L2FC with missense (VUS) - IFNG8 NGG GOF
+missense_hits_IFNG8_NGG_GOF <- data_graphing_filtered %>% 
+  filter(zscore_IFNG_Cntrl_prolif_average < -3 & Gene %in% c("JAK1", "JAK2", "STAT1", "IRF1", "IFNGR1","IFNGR2", "B2M", "SOCS1") & Consequence == "missense" | zscore_IFNG_Proliferation_Average < -2 & Gene %in% c("JAK1") & Consequence == "missense") %>% 
+  distinct()
+
+missense_hits_IFNG8_NGG_GOF
+
+write.csv(missense_hits_IFNG8_NGG_GOF, "protein_missense_hits_IFNG8_NGG_GOF.csv")
+```
