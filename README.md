@@ -1,6 +1,9 @@
 # Base_Editing_Screens
 Base editing screen analysis
 
+Attached is an R Markdown for the analysis of base editing screens associated with our manuscript. 
+Please see below for installed packages and versions. 
+
 R version 3.6.0 (2019-04-26)
 
 other attached packages:
