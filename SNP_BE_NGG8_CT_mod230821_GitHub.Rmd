@@ -175,19 +175,27 @@ scale_colour_manual(values=c("black", "orange", "grey65", "red2")) +
 theme_classic()
 plot2
 ```
+```{r}
+# replicate correlation - stats
+
+subset<- data %>% filter(Gene %in% c("JAK1", "JAK2", "STAT1", "IRF1", "IFNGR1","IFNGR2", "B2M", "SOCS1"))
+
+summary(lm(subset$zscore_IFNG_Cntrl_prolif_1 ~ subset$zscore_IFNG_Cntrl_prolif_2))
+summary(lm(subset$zscore_IFNG_Cntrl_FACS_1 ~ subset$zscore_IFNG_Cntrl_FACS_2))
+```
 
 ```{r}
-# replicate correlation
+# replicate correlation - plots
 pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
 
 plot1 <- ggplot(subset(data, Gene %in% c("JAK1", "JAK2", "STAT1", "IRF1", "IFNGR1","IFNGR2", "B2M", "SOCS1")), aes(x=zscore_IFNG_Cntrl_prolif_1, y= zscore_IFNG_Cntrl_prolif_2, colour = zscore_IFNG_Cntrl_FACS_average)) + geom_jitter(size=3, alpha=0.8, position = pos) +
-labs(title= "all pathway gRNAs", x = "z-score: proliferation screen exp.1", y = "z-score: proliferation screen exp. 2", colour = "L2FC: FACS screens") +
+labs(title= "all pathway gRNAs", x = "z-score: proliferation screen exp.1", y = "z-score: proliferation screen exp. 2", colour = "z-score: FACS screens") +
 geom_smooth(method = lm) +
 theme_classic()
 plot1
 
 plot2 <- ggplot(subset(data, Gene %in% c("JAK1", "JAK2", "STAT1", "IRF1", "IFNGR1","IFNGR2", "B2M", "SOCS1")), aes(x=zscore_IFNG_Cntrl_FACS_1, y= zscore_IFNG_Cntrl_FACS_2, colour = zscore_IFNG_Cntrl_prolif_average)) + geom_jitter(size=3, alpha=0.8, position = pos) +
-labs(title= "all pathway gRNAs", x = "z-score: FACS screen exp.1", y = "z-score: FACS screen exp. 2", colour = "L2FC: FACS screens") +
+labs(title= "all pathway gRNAs", x = "z-score: FACS screen exp.1", y = "z-score: FACS screen exp. 2", colour = "z-score: proliferation screens") +
 geom_smooth(method = lm) +
 theme_classic()
 plot2
@@ -491,7 +499,7 @@ data_graphing_filtered <- mutate(data_graphing_filtered, Consequence = ifelse(st
 data_graphing_filtered %>% group_by(sgRNA_ID) %>% select(sgRNA_ID, Consequence, Gene, Amino_Acid_Position, sgRNA_type)
 ```
 ```{r}
-# Make a simplified such that we can plot on a numerical scale
+# Make a simplified amino acid position such that we can plot on a numerical scale
 
 data_graphing_filtered <- mutate(data_graphing_filtered, Amino_Acid_Change = str_remove_all(Amino_Acid_Change, "p\\."))
 data_graphing_filtered <- mutate(data_graphing_filtered, Clinical_Protein_Change = str_remove_all(Clinical_Protein_Change, "p\\."))
@@ -562,121 +570,171 @@ plot1
 ```
 
 ```{r}
-# dot plots _ proliferation - JAK1 (1)
-pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
-
-plot1 <- ggplot(subset(data_graphing_filtered, Gene == "JAK1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
-geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
-labs(title= "JAK1 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
-scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
-geom_hline(yintercept=c(0,0),linetype="dotted") +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Cntrl_prolif_average < -3 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
-theme_classic()
-plot1
-```
-
-```{r}
-# dot plots _ proliferation - JAK2 (1)
-pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
-
-plot1 <- ggplot(subset(data_graphing_filtered, Gene == "JAK2"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
-geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
-labs(title= "JAK2 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
-scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
-geom_hline(yintercept=c(0,0),linetype="dotted") +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Cntrl_prolif_average < -3 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
-theme_classic()
-plot1
-```
-
-```{r}
-# dot plots _ proliferation - IFNGR1 (1)
-pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
-
-plot1 <- ggplot(subset(data_graphing_filtered, Gene == "IFNGR1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
-geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
-labs(title= "IFNGR1 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
-scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
-geom_hline(yintercept=c(0,0),linetype="dotted") +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Cntrl_prolif_average < -3 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
-theme_classic()
-plot1
-```
-
-```{r}
-# dot plots _ proliferation - IFNGR2 (1)
-pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
-
-plot1 <- ggplot(subset(data_graphing_filtered, Gene == "IFNGR2"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
-geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
-labs(title= "IFNGR2 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
-scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
-geom_hline(yintercept=c(0,0),linetype="dotted") +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Cntrl_prolif_average < -3 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
-theme_classic()
-plot1
-```
-
-```{r}
-# dot plots _ proliferation - STAT1 (1)
-pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
-
-plot1 <- ggplot(subset(data_graphing_filtered, Gene == "STAT1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
-geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
-labs(title= "STAT1 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
-scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
-geom_hline(yintercept=c(0,0),linetype="dotted") +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Cntrl_prolif_average < -3 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
-theme_classic()
-plot1
-```
-
-```{r}
-# dot plots _ proliferation - IRF1 (1)
-pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
-
-plot1 <- ggplot(subset(data_graphing_filtered, Gene == "IRF1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
-geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
-labs(title= "IRF1 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
-scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
-geom_hline(yintercept=c(0,0),linetype="dotted") +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Cntrl_prolif_average < -3 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
-theme_classic()
-plot1
-```
-
-```{r}
-# dot plots _ proliferation - SOCS1 (1)
-pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
-
-plot1 <- ggplot(subset(data_graphing_filtered, Gene == "SOCS1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
-geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
-labs(title= "SOCS1 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
-scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
-geom_hline(yintercept=c(0,0),linetype="dotted") +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Cntrl_prolif_average < -3 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
-theme_classic()
-plot1
+data_graphing_filtered %>% filter (Gene == "IFNGR1") %>% select(Amino_Acid_Position, Gene, Consequence, Amino_Acid_Position_simple)
 ```
 
 ```{r}
 # dot plots _ proliferation - B2M (1)
 pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
 
-plot1 <- ggplot(subset(data_graphing_filtered, Gene == "B2M"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) +#, size = SIFT, alpha = COSMIC_Count)) + 
+plot1 <- ggplot(subset(data_graphing_filtered, Consequence != "synonymous" & Consequence != "UTR" & Gene == "B2M"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) + 
 geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
-labs(title= "B2M - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
+labs(title= "", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "red2", "royal blue", "grey65", "purple")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
+annotate("rect", xmin =25, xmax = 113, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =70, y = -2.1, label = "Ig-like C1-type", size = 3, colour = "grey45") +
+facet_wrap(~Gene, scales = "free") +
+theme_classic()
+plot1
+```
+
+```{r}
+# dot plots _ proliferation - IFNGR1 (2)
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, Consequence != "synonymous" & Consequence != "UTR" & Gene == "IFNGR1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) + 
+geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
+labs(title= "", x="amino acid position", y = "z-score: control vs IFNG") +
 scale_colour_manual(values=c("black", "orange", "royal blue", "red2", "grey65", "purple")) +
 geom_hline(yintercept=c(0,0),linetype="dotted") +
 geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Cntrl_prolif_average < -3 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
+annotate("rect", xmin =1, xmax = 17, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =9, y = -2.1, label = "signal", size = 3, colour = "grey45") +
+annotate("rect", xmin =18, xmax = 245, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =125, y = -2.1, label = "extracellular", size = 3, colour = "grey45") +
+annotate("rect", xmin =267, xmax = 489, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =390, y = -2.1, label = "intracellular", size = 3, colour = "grey45") +
+facet_wrap(~Gene, scales = "free") +
+theme_classic()
+plot1
+```
+
+```{r}
+# dot plots _ proliferation - IFNGR2 (3)
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, Consequence != "synonymous" & Gene == "IFNGR2"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) + 
+geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
+labs(title= "", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "royal blue","red2",  "grey65", "purple")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
+annotate("rect", xmin =1, xmax = 21, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =10, y = -2.1, label = "signal", size = 3, colour = "grey45") +
+annotate("rect", xmin =26, xmax = 247, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =125, y = -2.1, label = "extracellular", size = 3, colour = "grey45") +
+annotate("rect", xmin =269, xmax = 337, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =300, y = -2.1, label = "intracellular", size = 3, colour = "grey45") +
+annotate("text", x =225, y = -2.1, label = "FN-type III", size = 3, colour = "grey45") +
+facet_wrap(~Gene, scales = "free") +
+theme_classic()
+plot1
+```
+
+```{r}
+# dot plots _ proliferation - IRF1 (4)
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, Consequence != "synonymous" & Gene == "IRF1" & Consequence != "UTR"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) + 
+geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
+labs(title= "", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "red2", "royal blue", "grey65", "purple")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
+annotate("rect", xmin =1, xmax = 124, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =55, y = -2.1, label = "DNA binding", size = 3, colour = "grey45") +
+facet_wrap(~Gene, scales = "free") +
+theme_classic()
+plot1
+```
+
+```{r}
+# dot plots _ proliferation - JAK1 (5)
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, Consequence != "synonymous" & Gene == "JAK1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) + 
+geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
+labs(title= "", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "red2", "royal blue", "grey65", "purple")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
+annotate("rect", xmin =34, xmax = 420, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =220, y = -2.1, label = "FERM", size = 3, colour = "grey45") +
+annotate("rect", xmin =439, xmax = 544, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =500, y = -2.1, label = "SH2-like", size = 3, colour = "grey45") +
+annotate("rect", xmin =583, xmax = 855, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =710, y = -2.1, label = "pseudokinase", size = 3, colour = "grey45") +
+annotate("rect", xmin =875, xmax = 1153, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =1000, y = -2.1, label = "kinase", size = 3, colour = "grey45") +
+facet_wrap(~Gene, scales = "free") +
+theme_classic()
+plot1
+```
+
+```{r}
+# dot plots _ proliferation - JAK2 (6)
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, Consequence != "synonymous" & Consequence != "UTR" & Gene == "JAK2"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) + 
+geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
+labs(title= "", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "red2", "royal blue", "grey65", "purple")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
+annotate("rect", xmin =37, xmax = 380, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =220, y = -2.1, label = "FERM", size = 3, colour = "grey45") +
+annotate("rect", xmin =401, xmax = 482, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =440, y = -2.1, label = "SH2-like", size = 3, colour = "grey45") +
+annotate("rect", xmin =545, xmax = 809, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =675, y = -2.1, label = "pseudokinase", size = 3, colour = "grey45") +
+annotate("rect", xmin =849, xmax = 1124, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =1000, y = -2.1, label = "kinase", size = 3, colour = "grey45") +
+facet_wrap(~Gene, scales = "free") +
+theme_classic()
+plot1
+```
+```{r}
+# dot plots _ proliferation - SOCS1 (7)
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, Consequence != "synonymous" & Consequence != "UTR" & Gene == "SOCS1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) + 
+geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
+labs(title= "", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "red2", "royal blue", "grey65", "purple")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
+annotate("rect", xmin =79, xmax = 174, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =125, y = -2.1, label = "SH2", size = 3, colour = "grey45") +
+annotate("rect", xmin =161, xmax = 210, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =190, y = -2.1, label = "SOCS box", size = 3, colour = "grey45") +
+facet_wrap(~Gene, scales = "free") +
+theme_classic()
+plot1
+```
+
+```{r}
+# dot plots _ proliferation - STAT1 (8)
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, Consequence != "synonymous" & Consequence != "UTR" & Gene == "STAT1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Cntrl_prolif_average, colour = Consequence)) + 
+geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
+labs(title= "", x="amino acid position", y = "z-score: control vs IFNG") +
+scale_colour_manual(values=c("black", "orange", "red2", "royal blue", "grey65", "purple")) +
+geom_hline(yintercept=c(0,0),linetype="dotted") +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
+annotate("rect", xmin =136, xmax = 317, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =225, y = -2.1, label = "coiled coil", size = 3, colour = "grey45") +
+annotate("rect", xmin =318, xmax = 488, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =410, y = -2.1, label = "DNA binding", size = 3, colour = "grey45") +
+annotate("rect", xmin =576, xmax = 683, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =625, y = -2.1, label = "SH2", size = 3, colour = "grey45") +
+annotate("rect", xmin =684, xmax = 739, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =710, y = -2.1, label = "TA", size = 3, colour = "grey45") +
+facet_wrap(~Gene, scales = "free") +
 theme_classic()
 plot1
 ```
@@ -707,20 +765,20 @@ plot1
 # dot plots JAK1 NGG screen
 pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
 
-plot1 <- ggplot(subset(data_graphing_filtered, Gene =="JAK1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Proliferation_Average, colour = Consequence)) + 
+plot1 <- ggplot(subset(data_graphing_filtered, Gene =="JAK1" & Consequence != "synonymous"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_Proliferation_Average, colour = Consequence)) + 
 geom_point(size=3, alpha=0.85, position = pos, shape = 16) +
 geom_text_repel(aes(label=ifelse(zscore_IFNG_Proliferation_Average >5 & PTM != "NA" | zscore_IFNG_Proliferation_Average < -2.5 & PTM != "NA", PTM, "")), size = 3, position = pos) +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_Proliferation_Average >5  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Proliferation_Average < -2.5 & Clinical_Protein_Change != "NA" & Consequence == "missense"| validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_Proliferation_Average >5  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_Proliferation_Average < -2.5 & Clinical_Protein_Change != "NA" & Consequence == "missense"| validation_cohort == "validated gRNAs", paste0(Amino_Acid_Position, "\n", "(", Citation, ")"), "")), size = 3, position = pos) +
 labs(title= "BE edit prediction (C>T): JAK1 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
 scale_colour_manual(values=c("black", "orange", "red2", "grey65")) +
 geom_hline(yintercept=c(0,0),linetype="dotted") +
 theme_classic()
 plot1
 
-plot2 <- ggplot(subset(data_graphing_filtered, Gene =="JAK1"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_FACS_Average, colour = Consequence)) + 
+plot2 <- ggplot(subset(data_graphing_filtered, Gene =="JAK1" & Consequence != "synonymous"), aes(x=Amino_Acid_Position_simple, y= zscore_IFNG_FACS_Average, colour = Consequence)) + 
 geom_point(size=3, alpha=0.85, position = pos, shape = 16) +
 geom_text_repel(aes(label=ifelse(zscore_IFNG_FACS_Average >5 & PTM != "NA" | zscore_IFNG_FACS_Average < -2.5 & PTM != "NA", PTM, "")), size = 3, position = pos) +
-geom_text_repel(aes(label=ifelse(zscore_IFNG_FACS_Average >5  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_FACS_Average < -2.5 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, " - ", Citation, ")"), "")), size = 3, position = pos) +
+geom_text_repel(aes(label=ifelse(zscore_IFNG_FACS_Average >5  & Clinical_Protein_Change != "NA" & Consequence == "missense"| zscore_IFNG_FACS_Average < -2.5 & Clinical_Protein_Change != "NA" & Consequence == "missense" | validation_cohort == "validated gRNAs", paste0(Amino_Acid_Position, "\n", "(", Citation, ")"), "")), size = 3, position = pos) +
 labs(title= "BE edit prediction (C>T): JAK1 - FACS screen", x="amino acid position", y = "z-score: control vs IFNG") +
 scale_colour_manual(values=c("black", "orange", "red2", "grey65")) +
 geom_hline(yintercept=c(0,0),linetype="dotted") +
@@ -730,21 +788,151 @@ plot2
 data_graphing_filtered
 ```
 
+
+```{r}
+# Clinical outcome graph
+
+pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
+
+plot1 <- ggplot(subset(data_graphing_filtered, is.na(Binarized_Clinical_Response) == FALSE), aes(x=Binarized_Clinical_Response, y= zscore_IFNG_Cntrl_prolif_average, colour = Gene)) +
+geom_boxplot(colour = "Salmon") +
+geom_jitter(alpha=0.80, position = pos, size = 3) +
+scale_colour_manual(values=c("orange", "royalblue1", "grey45","salmon", "black", "purple", "green3", "red")) +
+labs(title= "Clinical Response to ICB", x = "", y = "L2FC: proliferation screen") +
+geom_text_repel(aes(label = paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, ")")), size = 2, position = pos) +
+theme_classic()
+plot1
+
+plot2 <- ggplot(subset(data_graphing_filtered, is.na(Binarized_Clinical_Response) == FALSE), aes(x=Binarized_Clinical_Response, y= zscore_IFNG_Cntrl_FACS_average, colour = Gene)) +
+geom_boxplot(colour = "Salmon") +
+geom_jitter(alpha=0.7, position = pos, size = 3) +
+scale_colour_manual(values=c("orange", "royalblue1", "grey45","salmon", "black", "purple", "green3", "red")) +
+labs(title= "Clinical Response to ICB", x = "", y = "L2FC: FACS screen") +
+geom_text_repel(aes(label = paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, ")")), size = 2, position = pos) +
+theme_classic()
+plot2
+
+plot3 <- ggplot(subset(data_graphing_filtered, is.na(Binarized_Clinical_Response) == FALSE), aes(x=Binarized_Clinical_Response, y= zscore_IFNG_Proliferation_Average)) +
+geom_boxplot(colour = "Salmon") +
+geom_jitter(alpha=0.7, position = pos, size = 3) +
+scale_colour_manual(values=c("orange", "royalblue1", "grey45","salmon", "black", "purple", "green3", "red")) +
+labs(title= "Clinical Response to ICB: JAK1 NGG screen", x = "", y = "z-score: proliferation screen") +
+geom_text_repel(aes(label = paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, ")")), size = 2, position = pos) +
+theme_classic()
+plot3
+
+plot4 <- ggplot(subset(data_graphing_filtered, is.na(Binarized_Clinical_Response) == FALSE), aes(x=Binarized_Clinical_Response, y= zscore_IFNG_FACS_Average, colour = Gene)) +
+geom_boxplot(colour = "Salmon") +
+geom_jitter(alpha=0.7, position = pos, size = 3) +
+scale_colour_manual(values=c("orange", "royalblue1", "grey45","salmon", "black", "purple", "green3", "red")) +
+labs(title= "Clinical Response to ICB", x = "", y = "z-score: FACS screen") +
+geom_text_repel(aes(label = paste0(Amino_Acid_Change, "\n", "(", Clinical_Protein_Change, ")")), size = 2, position = pos) +
+theme_classic()
+plot4
+```
+
+```{r}
+# PHENOTYPES
+
+PHENOTYPES <- data %>% 
+  select(sgRNA_ID, PHENOTYPES) %>% 
+  filter(is.na(PHENOTYPES) == FALSE) %>%
+  filter(PHENOTYPES != "-") %>%
+  group_by(sgRNA_ID) %>%
+  distinct() %>%
+  summarise(PHENOTYPES = paste(PHENOTYPES, collapse = " "))
+
+PHENOTYPES
+
+```
+
 ```{r}
 # check protein_hits L2FC with missense (VUS) - IFNG8 NGG LOF
+
 missense_hits_IFNG8_NGG_LOF <- data_graphing_filtered %>% 
-  filter(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Gene %in% c("JAK1", "JAK2", "STAT1", "IRF1", "IFNGR1","IFNGR2", "B2M", "SOCS1") & Consequence == "missense" | zscore_IFNG_Proliferation_Average >5 & zscore_IFNG_FACS_Average >5 & Gene %in% c("JAK1") & Consequence == "missense") %>% 
+  filter(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Gene %in% c("JAK1", "JAK2", "STAT1", "IRF1", "IFNGR1","IFNGR2", "B2M", "SOCS1") & Consequence == "missense" | zscore_IFNG_Proliferation_Average >5 & zscore_IFNG_FACS_Average >5 & Gene %in% c("JAK1") & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Gene %in% c("SOCS1") & Consequence == "missense" ) %>% 
   distinct()
 
-missense_hits_IFNG8_NGG_LOF
+missense_hits_IFNG8_NGG_LOF <- left_join(missense_hits_IFNG8_NGG_LOF, PHENOTYPES)
+
+missense_hits_IFNG8_NGG_LOF <- mutate(missense_hits_IFNG8_NGG_LOF, Editor = "iBE3 NGG (IFNG pathway)")
+
+missense_hits_IFNG8_NGG_LOF 
 
 write.csv(missense_hits_IFNG8_NGG_LOF, "protein_missense_hits_IFNG8_NGG_LOF.csv")
 ```
 ```{r}
-# check protein_hits L2FC with missense (VUS) - IFNG8 NGG GOF
-missense_hits_IFNG8_NGG_GOF <- data_graphing_filtered %>% 
-  filter(zscore_IFNG_Cntrl_prolif_average < -3 & Gene %in% c("JAK1", "JAK2", "STAT1", "IRF1", "IFNGR1","IFNGR2", "B2M", "SOCS1") & Consequence == "missense" | zscore_IFNG_Proliferation_Average < -2 & Gene %in% c("JAK1") & Consequence == "missense") %>% 
+# LOF IFNG8 missense stats
+
+table_5 <- as_tibble(read.csv("Supp_Table_5_output_290921.csv", stringsAsFactors = FALSE, header = TRUE))
+table_5 %>% distinct()
+
+table_5 %>% select(Gene, Amino_Acid_Position, Function) %>%
+  distinct() %>%
+  count()
+
+table_5 %>% select(Gene, Amino_Acid_Position, Function) %>%
+  distinct() %>%
+  count(Function)
+
+table_5 %>% select(Gene, Amino_Acid_Position, Function) %>%
+  distinct() %>%
+  count(Gene)
+
+table_5 %>% select(Gene, Amino_Acid_Position, Function) %>%
+  filter(Function == "LOF") %>%
+  distinct() %>%
+  count(Gene)
+
+table_5 %>% select(Gene, Amino_Acid_Position, Function) %>%
+  filter(Function == "GOF") %>%
+  distinct() %>%
+  count(Gene)
+
+table_5 %>% filter(is.na(Clinical_Protein_Change) == FALSE) %>%
+  distinct() %>%
+  count()
+
+# percentage of clincal variants
+94/118*100
+
+table_5_expanded <- separate_rows(table_5, Amino_Acid_Position, sep=",")
+table_5_expanded <- separate_rows(table_5_expanded, Amino_Acid_Change, sep=",")
+table_5_expanded <- table_5_expanded %>%
+  filter(str_detect(Amino_Acid_Change, Amino_Acid_Position) == TRUE) %>%
+  distinct() 
+
+table_5_expanded <- mutate(table_5_expanded, Variant_Recapitulation = str_detect(Clinical_Protein_Change, Amino_Acid_Change))
+table_5_expanded <- table_5_expanded %>% select(Gene, Clinical_Protein_Change, Variant_Recapitulation) %>%
   distinct()
+
+table_5 %>% distinct()
+
+table_5 <- left_join(table_5, table_5_expanded) %>% distinct()
+
+table_5 %>% distinct()
+table_5 %>% filter(Variant_Recapitulation == TRUE)%>%
+  distinct()
+
+table_5 %>% filter(Variant_Recapitulation == TRUE)%>%
+  distinct() %>%
+  count()
+
+# percentage of exact variants
+46/118*100
+
+```
+
+```{r}
+# check protein_hits L2FC with missense (VUS) - IFNG8 NGG GOF
+
+missense_hits_IFNG8_NGG_GOF <- data_graphing_filtered %>% 
+  filter(zscore_IFNG_Cntrl_prolif_average < -3 & Gene %in% c("JAK1", "JAK2", "STAT1", "IRF1", "IFNGR1","IFNGR2", "B2M") & Consequence == "missense" | zscore_IFNG_Proliferation_Average < -2 & Gene %in% c("JAK1") & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Gene %in% c("SOCS1") & Consequence == "missense") %>% 
+  distinct()
+
+missense_hits_IFNG8_NGG_GOF <- left_join(missense_hits_IFNG8_NGG_GOF, PHENOTYPES)
+
+missense_hits_IFNG8_NGG_GOF <- mutate(missense_hits_IFNG8_NGG_GOF, Editor = "iBE3 NGG (IFNG pathway)")
 
 missense_hits_IFNG8_NGG_GOF
 
