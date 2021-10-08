@@ -4,6 +4,13 @@ author: "Matt Coelho"
 date: "07/06/2020"
 output: html_document
 ---
+
+```{r}
+# author: Matt Coelho
+# Copyright (C) <2021> Genome Research Ltd.
+# See License - MIT License
+```
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
@@ -182,6 +189,7 @@ subset<- data %>% filter(Gene %in% c("JAK1", "JAK2", "STAT1", "IRF1", "IFNGR1","
 
 summary(lm(subset$zscore_IFNG_Cntrl_prolif_1 ~ subset$zscore_IFNG_Cntrl_prolif_2))
 summary(lm(subset$zscore_IFNG_Cntrl_FACS_1 ~ subset$zscore_IFNG_Cntrl_FACS_2))
+summary(lm(subset$zscore_IFNG_Cntrl_FACS_average ~ subset$zscore_IFNG_Cntrl_prolif_average))
 ```
 
 ```{r}
@@ -584,7 +592,8 @@ scale_colour_manual(values=c("black", "orange", "red2", "royal blue", "grey65", 
 geom_hline(yintercept=c(0,0),linetype="dotted") +
 geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
 annotate("rect", xmin =25, xmax = 113, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =70, y = -2.1, label = "Ig-like C1-type", size = 3, colour = "grey45") +
+annotate("text", x =70, y = -2.3, label = "Ig-like C1-type", size = 3, colour = "grey45") +
+ylim(-10, 15) +
 facet_wrap(~Gene, scales = "free") +
 theme_classic()
 plot1
@@ -602,11 +611,12 @@ geom_hline(yintercept=c(0,0),linetype="dotted") +
 geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
 geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
 annotate("rect", xmin =1, xmax = 17, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =9, y = -2.1, label = "signal", size = 3, colour = "grey45") +
+annotate("text", x =9, y = -2.3, label = "signal", size = 3, colour = "grey45") +
 annotate("rect", xmin =18, xmax = 245, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =125, y = -2.1, label = "extracellular", size = 3, colour = "grey45") +
+annotate("text", x =125, y = -2.3, label = "extracellular", size = 3, colour = "grey45") +
 annotate("rect", xmin =267, xmax = 489, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =390, y = -2.1, label = "intracellular", size = 3, colour = "grey45") +
+annotate("text", x =390, y = -2.3, label = "intracellular", size = 3, colour = "grey45") +
+ylim(-10, 15) +
 facet_wrap(~Gene, scales = "free") +
 theme_classic()
 plot1
@@ -624,12 +634,13 @@ geom_hline(yintercept=c(0,0),linetype="dotted") +
 geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average >3 & PTM != "NA" | zscore_IFNG_Cntrl_prolif_average < -3 & PTM != "NA", PTM, "")), size = 3, position = pos) +
 geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
 annotate("rect", xmin =1, xmax = 21, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =10, y = -2.1, label = "signal", size = 3, colour = "grey45") +
+annotate("text", x =10, y = -2.3, label = "signal", size = 3, colour = "grey45") +
 annotate("rect", xmin =26, xmax = 247, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =125, y = -2.1, label = "extracellular", size = 3, colour = "grey45") +
+annotate("text", x =125, y = -2.3, label = "extracellular", size = 3, colour = "grey45") +
 annotate("rect", xmin =269, xmax = 337, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =300, y = -2.1, label = "intracellular", size = 3, colour = "grey45") +
-annotate("text", x =225, y = -2.1, label = "FN-type III", size = 3, colour = "grey45") +
+annotate("text", x =300, y = -2.3, label = "intracellular", size = 3, colour = "grey45") +
+annotate("text", x =225, y = -2.3, label = "FN-type III", size = 3, colour = "grey45") +
+ylim(-10, 15) +
 facet_wrap(~Gene, scales = "free") +
 theme_classic()
 plot1
@@ -646,7 +657,8 @@ scale_colour_manual(values=c("black", "orange", "red2", "royal blue", "grey65", 
 geom_hline(yintercept=c(0,0),linetype="dotted") +
 geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
 annotate("rect", xmin =1, xmax = 124, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =55, y = -2.1, label = "DNA binding", size = 3, colour = "grey45") +
+annotate("text", x =55, y = -2.3, label = "DNA binding", size = 3, colour = "grey45") +
+ylim(-10, 15) +
 facet_wrap(~Gene, scales = "free") +
 theme_classic()
 plot1
@@ -663,13 +675,14 @@ scale_colour_manual(values=c("black", "orange", "red2", "royal blue", "grey65", 
 geom_hline(yintercept=c(0,0),linetype="dotted") +
 geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
 annotate("rect", xmin =34, xmax = 420, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =220, y = -2.1, label = "FERM", size = 3, colour = "grey45") +
+annotate("text", x =220, y = -2.3, label = "FERM", size = 3, colour = "grey45") +
 annotate("rect", xmin =439, xmax = 544, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =500, y = -2.1, label = "SH2-like", size = 3, colour = "grey45") +
+annotate("text", x =500, y = -2.3, label = "SH2-like", size = 3, colour = "grey45") +
 annotate("rect", xmin =583, xmax = 855, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =710, y = -2.1, label = "pseudokinase", size = 3, colour = "grey45") +
+annotate("text", x =710, y = -2.3, label = "pseudokinase", size = 3, colour = "grey45") +
 annotate("rect", xmin =875, xmax = 1153, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =1000, y = -2.1, label = "kinase", size = 3, colour = "grey45") +
+annotate("text", x =1000, y = -2.3, label = "kinase", size = 3, colour = "grey45") +
+ylim(-10, 15) +
 facet_wrap(~Gene, scales = "free") +
 theme_classic()
 plot1
@@ -686,13 +699,14 @@ scale_colour_manual(values=c("black", "orange", "red2", "royal blue", "grey65", 
 geom_hline(yintercept=c(0,0),linetype="dotted") +
 geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
 annotate("rect", xmin =37, xmax = 380, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =220, y = -2.1, label = "FERM", size = 3, colour = "grey45") +
+annotate("text", x =220, y = -2.3, label = "FERM", size = 3, colour = "grey45") +
 annotate("rect", xmin =401, xmax = 482, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =440, y = -2.1, label = "SH2-like", size = 3, colour = "grey45") +
+annotate("text", x =440, y = -2.3, label = "SH2-like", size = 3, colour = "grey45") +
 annotate("rect", xmin =545, xmax = 809, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =675, y = -2.1, label = "pseudokinase", size = 3, colour = "grey45") +
+annotate("text", x =675, y = -2.3, label = "pseudokinase", size = 3, colour = "grey45") +
 annotate("rect", xmin =849, xmax = 1124, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =1000, y = -2.1, label = "kinase", size = 3, colour = "grey45") +
+annotate("text", x =1000, y = -2.3, label = "kinase", size = 3, colour = "grey45") +
+ylim(-10, 15) +
 facet_wrap(~Gene, scales = "free") +
 theme_classic()
 plot1
@@ -708,9 +722,10 @@ scale_colour_manual(values=c("black", "orange", "red2", "royal blue", "grey65", 
 geom_hline(yintercept=c(0,0),linetype="dotted") +
 geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
 annotate("rect", xmin =79, xmax = 174, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =125, y = -2.1, label = "SH2", size = 3, colour = "grey45") +
+annotate("text", x =125, y = 2.3, label = "SH2", size = 3, colour = "grey45") +
 annotate("rect", xmin =161, xmax = 210, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =190, y = -2.1, label = "SOCS box", size = 3, colour = "grey45") +
+annotate("text", x =190, y = 2.3, label = "SOCS box", size = 3, colour = "grey45") +
+ylim(-10, 15) +
 facet_wrap(~Gene, scales = "free") +
 theme_classic()
 plot1
@@ -727,13 +742,14 @@ scale_colour_manual(values=c("black", "orange", "red2", "royal blue", "grey65", 
 geom_hline(yintercept=c(0,0),linetype="dotted") +
 geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average > 3 & zscore_IFNG_Cntrl_FACS_average > 3 & Consequence == "missense" | zscore_IFNG_Cntrl_prolif_average < -3 & Consequence == "missense" | validation_cohort == "validated gRNAs", Amino_Acid_Position, "")), size = 3, position = pos) +
 annotate("rect", xmin =136, xmax = 317, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =225, y = -2.1, label = "coiled coil", size = 3, colour = "grey45") +
+annotate("text", x =225, y = 2.3, label = "coiled coil", size = 3, colour = "grey45") +
 annotate("rect", xmin =318, xmax = 488, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =410, y = -2.1, label = "DNA binding", size = 3, colour = "grey45") +
+annotate("text", x =410, y = 2.3, label = "DNA binding", size = 3, colour = "grey45") +
 annotate("rect", xmin =576, xmax = 683, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =625, y = -2.1, label = "SH2", size = 3, colour = "grey45") +
+annotate("text", x =625, y = 2.3, label = "SH2", size = 3, colour = "grey45") +
 annotate("rect", xmin =684, xmax = 739, ymin = -2, ymax = 2, alpha = 0.1) +
-annotate("text", x =710, y = -2.1, label = "TA", size = 3, colour = "grey45") +
+annotate("text", x =710, y = 2.3, label = "TA", size = 3, colour = "grey45") +
+ylim(-10, 15) +
 facet_wrap(~Gene, scales = "free") +
 theme_classic()
 plot1
@@ -772,6 +788,14 @@ geom_text_repel(aes(label=ifelse(zscore_IFNG_Proliferation_Average >5  & Clinica
 labs(title= "BE edit prediction (C>T): JAK1 - proliferation screen", x="amino acid position", y = "z-score: control vs IFNG") +
 scale_colour_manual(values=c("black", "orange", "red2", "grey65")) +
 geom_hline(yintercept=c(0,0),linetype="dotted") +
+annotate("rect", xmin =34, xmax = 420, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =220, y = -2.3, label = "FERM", size = 3, colour = "grey45") +
+annotate("rect", xmin =439, xmax = 544, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =500, y = -2.3, label = "SH2-like", size = 3, colour = "grey45") +
+annotate("rect", xmin =583, xmax = 855, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =710, y = -2.3, label = "pseudokinase", size = 3, colour = "grey45") +
+annotate("rect", xmin =875, xmax = 1153, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =1000, y = -2.3, label = "kinase", size = 3, colour = "grey45") +
 theme_classic()
 plot1
 
@@ -782,6 +806,14 @@ geom_text_repel(aes(label=ifelse(zscore_IFNG_FACS_Average >5  & Clinical_Protein
 labs(title= "BE edit prediction (C>T): JAK1 - FACS screen", x="amino acid position", y = "z-score: control vs IFNG") +
 scale_colour_manual(values=c("black", "orange", "red2", "grey65")) +
 geom_hline(yintercept=c(0,0),linetype="dotted") +
+annotate("rect", xmin =34, xmax = 420, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =220, y = -2.3, label = "FERM", size = 3, colour = "grey45") +
+annotate("rect", xmin =439, xmax = 544, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =500, y = -2.3, label = "SH2-like", size = 3, colour = "grey45") +
+annotate("rect", xmin =583, xmax = 855, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =710, y = -2.3, label = "pseudokinase", size = 3, colour = "grey45") +
+annotate("rect", xmin =875, xmax = 1153, ymin = -2, ymax = 2, alpha = 0.1) +
+annotate("text", x =1000, y = -2.3, label = "kinase", size = 3, colour = "grey45") +
 theme_classic()
 plot2
 
