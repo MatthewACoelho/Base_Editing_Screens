@@ -63,6 +63,7 @@ ui <- fluidPage(
             #results
             plotlyOutput("plot"),
             br(),
+            hr(),
             
             #data table
             DT::dataTableOutput("results"),
@@ -70,11 +71,11 @@ ui <- fluidPage(
             #MIT license etc with footnotes
             br(),
             hr(),
-            h5("please cite: X..."),
+            #h5("please cite: X..."),
             a("publication", href = " "),
             br(),
             a("Matt Coelho's GitHub", href = "https://github.com/MatthewACoelho/"),
-            hr(),
+            br(),
             a("BEstimate GitHub", href = "https://github.com/CansuDincer/BEstimate"),
             hr(),
             h5("License"),
@@ -82,7 +83,8 @@ ui <- fluidPage(
             The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
             THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE."),
             hr(),
-            h6("Shiny app development by Matt Coelho. Analysis by Matt Coelho. We used BEstimate software and VEP for base editing predictions")
+            h6("Shiny app development by Matt Coelho. Analysis by Matt Coelho. We used BEstimate software and VEP for base editing predictions"),
+            a("VEP", href = "https://www.ensembl.org/info/docs/tools/vep/index.html"),
          
         )
     )
@@ -119,6 +121,9 @@ server <- function(input, output) {
                     x=~Protein_Position, 
                     y=~L2FC_IFNg_Control_prolif,
                     color=~Consequence,
+                    colors = c("black", "#fabd2f", "#cc241d"),
+                    size = 2,
+                    alpha = 0.8,
                     hoverinfo="text", 
                     text = ~paste0(Protein_Change)
             ) %>% layout(xaxis=list(title = "amino acid position"), yaxis = list(title = "L2FC"), legend = list(title = list(text = "consequence")))
@@ -127,6 +132,9 @@ server <- function(input, output) {
                     x=~Protein_Position, 
                     y=~L2FC_IFNg_Control_FACS,
                     color=~Consequence,
+                    colors = c("black", "#fabd2f", "#cc241d"),
+                    size = 2,
+                    alpha = 0.8,
                     hoverinfo="text", 
                     text = ~paste0(Protein_Change)
             ) %>% layout(xaxis=list(title = "amino acid position"), yaxis = list(title = "L2FC"), legend = list(title = list(text = "consequence")))
