@@ -28,7 +28,9 @@ ui <- fluidPage(
     #description
     em("interact with base editing mutagenesis data - response to IFNg in HT-29 colorectal cancer cells", 
          p("we used proliferation (cell death) and FACS-based (MHC-I and PDL-1 expression) screening assays",
-           p("CBE: cytosine base editor, ABE: adenine base editor"
+           p("CBE: cytosine base editor, ABE: adenine base editor", 
+             p("PTM: post-translational modification"
+             )
            )
          )
        ),
@@ -43,6 +45,8 @@ ui <- fluidPage(
                   "screen", c("proliferation", "FACS")),
         selectInput("editor",
                     "editor", c("BE3_NGG_JAK1_focused", "BE3_NGG_IFNG_pathway", "BE4max_YE1_NGN", "BE3.9max_NGN", "ABE8e_NGN")),
+        selectInput("labels",
+                    "labels", c("predicted amino acid change", "PTMs", "associated phenotypes")),
         hr(),
         downloadButton("downloadData", "download results"),
         ),
@@ -114,8 +118,8 @@ server <- function(input, output) {
         data <- data %>% filter(Gene == input$gene) %>%
             filter(editor == input$editor)
         
-        if (input$screen == "proliferation") {
-            plot_ly(data, 
+        if(input$screen == "proliferation" & input$labels == "predicted amino acid change")
+            {plot_ly(data, 
                     x=~Amino_Acid_Position_simple, 
                     y=~zscore_proliferation,
                     color=~Consequence,
@@ -123,21 +127,74 @@ server <- function(input, output) {
                     size = 2,
                     alpha = 0.8,
                     hoverinfo="text", 
-                    text = ~paste0(Amino_Acid_Change)
+                    text = ~paste(Amino_Acid_Change)
             ) %>% layout(xaxis=list(title = "amino acid position"), yaxis = list(title = "z-score"), legend = list(title = list(text = "consequence")))
-        } else {
-            plot_ly(data, 
-                    x=~Amino_Acid_Position_simple, 
-                    y=~zscore_FACS,
-                    color=~Consequence,
-                    colors = c("black", "#fabd2f", "#cc241d", "blue"),
-                    size = 2,
-                    alpha = 0.8,
-                    hoverinfo="text",
-                    text = ~paste0(Amino_Acid_Change)
-            ) %>% layout(xaxis=list(title = "amino acid position"), yaxis = list(title = "z-score"), legend = list(title = list(text = "consequence")))
-        }
+        } 
         
+        else if(input$screen == "proliferation" & input$labels == "associated phenotypes")
+        {plot_ly(data, 
+                 x=~Amino_Acid_Position_simple, 
+                 y=~zscore_proliferation,
+                 color=~Consequence,
+                 colors = c("black", "#fabd2f", "#cc241d", "blue"),
+                 size = 2,
+                 alpha = 0.8,
+                 hoverinfo="text", 
+                 text = ~paste(Amino_Acid_Position, phenotype)
+        ) %>% layout(xaxis=list(title = "amino acid position"), yaxis = list(title = "z-score"), legend = list(title = list(text = "consequence")))
+        } 
+        
+        else if(input$screen == "proliferation" & input$labels == "PTMs")
+        {plot_ly(data, 
+                 x=~Amino_Acid_Position_simple, 
+                 y=~zscore_proliferation,
+                 color=~Consequence,
+                 colors = c("black", "#fabd2f", "#cc241d", "blue"),
+                 size = 2,
+                 alpha = 0.8,
+                 hoverinfo="text", 
+                 text = ~paste(Amino_Acid_Position, PTM)
+        ) %>% layout(xaxis=list(title = "amino acid position"), yaxis = list(title = "z-score"), legend = list(title = list(text = "consequence")))
+        } 
+        
+        else if(input$screen == "FACS" & input$labels == "predicted amino acid change")
+        {plot_ly(data, 
+                 x=~Amino_Acid_Position_simple, 
+                 y=~zscore_FACS,
+                 color=~Consequence,
+                 colors = c("black", "#fabd2f", "#cc241d", "blue"),
+                 size = 2,
+                 alpha = 0.8,
+                 hoverinfo="text", 
+                 text = ~paste(Amino_Acid_Change)
+        ) %>% layout(xaxis=list(title = "amino acid position"), yaxis = list(title = "z-score"), legend = list(title = list(text = "consequence")))
+        } 
+        
+        else if(input$screen == "FACS" & input$labels == "associated phenotypes")
+        {plot_ly(data, 
+                 x=~Amino_Acid_Position_simple, 
+                 y=~zscore_FACS,
+                 color=~Consequence,
+                 colors = c("black", "#fabd2f", "#cc241d", "blue"),
+                 size = 2,
+                 alpha = 0.8,
+                 hoverinfo="text", 
+                 text = ~paste(Amino_Acid_Position, phenotype)
+        ) %>% layout(xaxis=list(title = "amino acid position"), yaxis = list(title = "z-score"), legend = list(title = list(text = "consequence")))
+        } 
+        
+        else if(input$screen == "FACS" & input$labels == "PTMs")
+        {plot_ly(data, 
+                 x=~Amino_Acid_Position_simple, 
+                 y=~zscore_FACS,
+                 color=~Consequence,
+                 colors = c("black", "#fabd2f", "#cc241d", "blue"),
+                 size = 2,
+                 alpha = 0.8,
+                 hoverinfo="text", 
+                 text = ~paste(Amino_Acid_Position, PTM)
+        ) %>% layout(xaxis=list(title = "amino acid position"), yaxis = list(title = "z-score"), legend = list(title = list(text = "consequence")))
+        } 
     })
     
     #hover
