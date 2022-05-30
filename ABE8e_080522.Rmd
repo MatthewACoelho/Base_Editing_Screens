@@ -21,6 +21,7 @@ library(tidyverse)
 library(reshape2)
 library(ggrepel)
 library(stringr)
+library(ggpointdensity)
 ```
 
 ```{r}
@@ -774,7 +775,7 @@ pos <- position_jitter(seed = 2, width = 0.2, height = 0.2)
 plot1 <- ggplot(subset(data_graphing_filtered, Consequence_CBE_YE1 %in% c("synonymous","UTR", "promoter", NA) ==FALSE & Gene == "JAK1"), aes(x=Amino_Acid_Position_simple_CBE_YE1, y= zscore_IFNG_Cntrl_prolif_average_NG_BE4, colour = Consequence_CBE_YE1)) + 
 geom_point(position = pos, shape = 16, alpha = 0.80, size =3) +
 labs(title= "", x="amino acid position", y = "zscore_IFNG_Cntrl_prolif_average_NG_BE4") +
-scale_colour_manual(values=c("black", "orange", "red")) +
+scale_colour_manual(values=c("black", "orange", "red", "green")) +
 geom_hline(yintercept=c(0,0),linetype="dotted") +
 
 geom_text_repel(aes(label=ifelse(zscore_IFNG_Cntrl_prolif_average_NG_BE4 > 5 & Consequence_CBE_YE1 %in% c("missense", "missense proline") & is.na(Clinical_Protein_Change_CBE_YE1)==FALSE| zscore_IFNG_Cntrl_prolif_average_NG_BE4 < -3 & Consequence_CBE_YE1 %in% c("missense", "missense proline") & is.na(Clinical_Protein_Change_CBE_YE1)==FALSE, paste0(Amino_Acid_Change_CBE_YE1, "\n", "(", Clinical_Protein_Change_CBE_YE1, ")"), "")), size = 3, position = pos) +
@@ -991,8 +992,206 @@ app_data <- bind_rows(app_data, CRC_9)
 
 app_data
 app_data <- mutate(app_data, validation = ifelse(sgRNA_ID %in% c("908523459", "908523616", "908514537", "908514536", "908509432", "908510622", "908509431", "908510623", "908508937", "908509672", "908509010", "908512440", "908510034", "908510164", "908509007", "908510033", "908510274", "908509428", "908510028", "908510170", "908510032", "908508944", "908508948", "908510162"), "validated gRNA", "putative"))
-write.csv(app_data, "input.csv")
+```
+```{r}
+# amplicon seq data and scDNA seq data
 
+amplicon_seq_data <- as_tibble(read.csv("amplicon_seq_data.csv", stringsAsFactors = FALSE, header = TRUE))
+sc_seq_data <- as_tibble(read.csv("gRNA_info_coordinates_uniquely_assigned_JAK1_MLEAF_270522.csv", stringsAsFactors = FALSE, header = TRUE))
+
+# make protein_change_simplified into three letter code for compatibility
+amplicon_seq_data <- mutate(amplicon_seq_data, protein_change_simplified = ifelse(protein_change_simplified != c("intronic", "splice variant"), str_replace_all(string = protein_change_simplified, 
+                c("A" = "Ala",
+                  "R" = "Arg",
+                  "N" = "Asn",
+                  "D" = "Asp",
+                  "C" = "Cys",
+                  "G" = "Gly",
+                  "E" = "Glu",
+                  "Q" = "Gln",
+                  "H" = "His",
+                  "I" = "Ile",
+                  "L" = "Leu",
+                  "K" = "Lys",
+                  "M" = "Met",
+                  "P" = "Pro",
+                  "F" = "Phe",
+                  "S" = "Ser",
+                  "T" = "Thr",
+                  "W" = "Trp",
+                  "Y" = "Tyr",
+                  "V" = "Val",
+                  "\\*" = "Ter")), protein_change_simplified))
+
+amplicon_seq_data <- amplicon_seq_data %>% rename(protein_change_ampseq = protein_change_simplified) 
+amplicon_seq_data <-amplicon_seq_data %>% select(c(sgRNA_ID, protein_change_ampseq,	edit_position_ampseq))
+sc_seq_data <- sc_seq_data %>% select(c(sgRNA_ID, edits_scDNAseq,	proportions_scDNAseq))
+amplicon_seq_data <- mutate(amplicon_seq_data, sgRNA_ID = as.character(sgRNA_ID))
+sc_seq_data <- mutate(sc_seq_data, sgRNA_ID = as.character(sgRNA_ID))
+
+edit_position_ampseq <- amplicon_seq_data %>%
+  group_by(sgRNA_ID) %>%
+  summarise(edit_position_ampseq = paste(edit_position_ampseq, collapse = ", "))
+
+protein_change_ampseq <- amplicon_seq_data %>%
+  group_by(sgRNA_ID) %>%
+  summarise(protein_change_ampseq = paste(protein_change_ampseq, collapse = ", "))
+
+amplicon_seq_data <- amplicon_seq_data %>%
+  select(!c(edit_position_ampseq, protein_change_ampseq))
+amplicon_seq_data <- left_join(amplicon_seq_data, edit_position_ampseq)
+amplicon_seq_data <- left_join(amplicon_seq_data, protein_change_ampseq)
+
+app_data_seq <- app_data %>% filter(editor == "BE3-NGG (JAK1)")
+
+lib <- as_tibble(read.csv("bedit_jak1_sgrnas_v1.1_annotated_library_NG.csv", stringsAsFactors = FALSE, header = TRUE))
+lib <- lib %>% select(sgRNA_ID, seq, strand, start, end, chr)
+
+sc_seq_data <- sc_seq_data %>% separate_rows(c(edits_scDNAseq, proportions_scDNAseq), sep =";") %>% mutate(pos = str_extract(edits_scDNAseq, "[[:digit:]]+")) 
+sc_seq_data <- left_join(sc_seq_data, lib)
+sc_seq_data <- mutate(sc_seq_data, pos = as.numeric(pos))
+sc_seq_data <- mutate(sc_seq_data, edit_position_scseq = ifelse(strand == "+", pos-start+1, end-pos+1))
+
+edit_position_scseq <- sc_seq_data %>%
+  group_by(sgRNA_ID) %>%
+  summarise(edit_position_scseq = paste(edit_position_scseq, collapse = ", "))
+sc_seq_data <- sc_seq_data %>%
+  select(!c(edit_position_scseq))
+sc_seq_data <- left_join(sc_seq_data, edit_position_scseq)
+
+sc_seq_data
+edits_scDNAseq <- sc_seq_data %>%
+  group_by(sgRNA_ID) %>%
+  summarise(edits_scDNAseq = paste(edits_scDNAseq, collapse = ", "))
+proportions_scDNAseq <- sc_seq_data %>%
+  group_by(sgRNA_ID) %>%
+  summarise(proportions_scDNAseq = paste(proportions_scDNAseq, collapse = ", "))
+sc_seq_data <- sc_seq_data %>% select(!c(proportions_scDNAseq, edits_scDNAseq, pos))
+sc_seq_data <- left_join(sc_seq_data, proportions_scDNAseq) %>% distinct()
+sc_seq_data <- left_join(sc_seq_data, edits_scDNAseq) %>% distinct()
+
+app_data_seq <- left_join(app_data_seq, sc_seq_data)
+app_data_seq <- left_join(app_data_seq, amplicon_seq_data)
+app_data_seq
+```
+```{r}
+#protein consequence of scDNA seq
+sc_seq_data <- as_tibble(read.csv("gRNA_info_coordinates_uniquely_assigned_JAK1_MLEAF_270522.csv", stringsAsFactors = FALSE, header = TRUE))
+sc_seq_data %>% select(edits_scDNAseq) %>% filter(edits_scDNAseq != "=") %>% distinct()
+sc_seq_data <- sc_seq_data %>% separate_rows(c(edits_scDNAseq, proportions_scDNAseq), sep =";")
+VEP_sc <- sc_seq_data %>% 
+  filter(edits_scDNAseq != "=") %>% 
+  distinct() %>%
+  mutate(VEP = paste0("1", " ", substring(edits_scDNAseq, 1, 8), " ", substring(edits_scDNAseq, 1, 8), " ", substring(edits_scDNAseq, 16, 16), "/", substring(edits_scDNAseq, 18, 18), " ", "+"))
+VEP_sc %>% select(edits_scDNAseq, VEP) %>% write.csv("VEP_input_scDNAseq.csv")
+VEP_sc
+sc_seq_data <- mutate(sc_seq_data, X.Uploaded_variation = paste0("1", "_", substring(edits_scDNAseq, 1, 8), "_", substring(edits_scDNAseq, 16, 16), "/", substring(edits_scDNAseq, 18, 18)))
+sc_seq_data
+VEP_results_scDNAseq <- as_tibble(read.csv("VEP_results_scDNAseq.csv", stringsAsFactors = FALSE, header = TRUE))
+VEP_results_scDNAseq
+sc_seq_data2 <- left_join(sc_seq_data, VEP_results_scDNAseq)
+sc_seq_data3 <- sc_seq_data2 %>%
+  mutate(HGVSp2 = substr(HGVSp, 21,50)) %>%
+  rename(protein_change_scDNAseq = HGVSp2) %>%
+  select(!c(X.Uploaded_variation, Consequence, HGVSp, Amino_acids))
+sc_seq_data3 <- mutate(sc_seq_data3, protein_change_scDNAseq = str_replace(protein_change_scDNAseq
+, "%3D", "="))
+sc_seq_data3
+sc_seq_data3 <- mutate(sc_seq_data3, protein_change_scDNAseq = if_else(is.na(protein_change_scDNAseq) == TRUE, "NA", if_else(protein_change_scDNAseq == "", "NA", protein_change_scDNAseq)))
+sc_seq_data4 <- sc_seq_data3 %>% 
+  group_by(sgRNA_ID) %>% summarise(protein_change_scDNAseq = paste(protein_change_scDNAseq, collapse = ", "))
+sc_seq_data4 <- mutate(sc_seq_data4, sgRNA_ID = as.character(sgRNA_ID))
+sc_seq_data3
+```
+
+```{r}
+#print Supplementary table
+app_data_seq  <- left_join(app_data_seq, sc_seq_data4)
+app_data_seq %>% filter(is.na(edits_scDNAseq) == FALSE | is.na(edit_position_ampseq) == FALSE) %>% 
+  distinct() %>%
+  write.csv("validated_gRNAs.csv")
+
+app_data_seq %>% filter(is.na(edits_scDNAseq) == FALSE | is.na(edit_position_ampseq) == FALSE) %>% 
+  distinct() %>%
+  filter(zscore_proliferation > 3 | zscore_proliferation < -3) %>%
+  write.csv("validated_hits.csv")
+validated_sgRNAs <- app_data_seq %>% filter(is.na(edit_position_ampseq) == FALSE | is.na(edits_scDNAseq) == FALSE) %>%  select(sgRNA_ID) %>% distinct() 
+validated_sgRNAs
+app_data <- mutate(app_data, validation = if_else(sgRNA_ID %in% c(validated_sgRNAs$sgRNA_ID), "validated by sequencing", "putative-prediction from gRNA"))
+app_data %>% filter(validation == "validated by sequencing")
+app_data 
+app_data <- mutate(app_data, off_target_summary_NGN = if_else(editor == "BE3-NGG (JAK1)", "NA", 
+                                                              if_else(editor == "BE3-NGG (IFNG pathway)", "NA", off_target_summary_NGN)))
+app_data
+app_data_seq
+
+scjoin <- app_data_seq %>%
+  select(sgRNA_ID, protein_change_ampseq, edits_scDNAseq, protein_change_scDNAseq) %>% distinct()
+
+app_data <- left_join(app_data, scjoin)
+app_data <- mutate(app_data, validation = if_else(editor == "BE3-NGG (JAK1)", validation, if_else(editor == "BE3-NGG (IFNG pathway)", validation, "putative-prediction from gRNA")))
+app_data <- mutate(app_data, protein_change_ampseq = if_else(editor == "BE3-NGG (JAK1)", protein_change_ampseq, if_else(editor == "BE3-NGG (IFNG pathway)", protein_change_ampseq, "NA")))
+app_data <- mutate(app_data, protein_change_scDNAseq = if_else(editor == "BE3-NGG (JAK1)", protein_change_scDNAseq, if_else(editor == "BE3-NGG (IFNG pathway)", protein_change_scDNAseq, "NA")))
+app_data <- mutate(app_data, edits_scDNAseq = if_else(editor == "BE3-NGG (JAK1)", edits_scDNAseq, if_else(editor == "BE3-NGG (IFNG pathway)", edits_scDNAseq, "NA")))
+app_data
+write.csv(app_data, "input.csv")
+```
+
+```{r}
+#annotate sc DNA seq data
+sc_seq_data <- sc_seq_data %>% separate_rows(c(edit_position_scseq, edits_scDNAseq, proportions_scDNAseq), sep = ",")
+sc_seq_data <- sc_seq_data %>% mutate(penetrance = ifelse(str_detect(edits_scDNAseq, "1/1/1"), "homo",
+                                                                     ifelse(str_detect(edits_scDNAseq, "="), "WT", "het")))
+sc_seq_data <- mutate(sc_seq_data, proportions_scDNAseq = as.numeric(proportions_scDNAseq))
+sc_seq_data <- mutate(sc_seq_data, edit_position_scseq = as.numeric(edit_position_scseq))
+sc_seq_data %>% filter(is.na(edit_position_scseq) == FALSE)
+sc_seq_data %>% filter(is.na(edit_position_scseq) == FALSE & edit_position_scseq > 3 & edit_position_scseq < 10) 
+sc_seq_data %>% filter(is.na(edit_position_scseq) == FALSE & penetrance == "homo")
+sc_seq_data %>% filter(is.na(edit_position_scseq) == FALSE & edit_position_scseq > 3 & edit_position_scseq < 10 & penetrance == "homo") 
+81/104*100
+68/81*100
+94/132*100
+
+app_data_seq %>% filter(is.na(edits_scDNAseq) == FALSE) %>% distinct()
+app_data_seq %>% filter(edits_scDNAseq == "=") %>% distinct()
+app_data_seq %>% filter(edits_scDNAseq != "=")  %>% distinct()
+
+app_data_seq <-  mutate(app_data_seq, window = substr(guide, 4, 9))
+app_data_seq %>% filter(edits_scDNAseq == "=") %>% select(window, edits_scDNAseq, guide) 
+app_data_seq %>% filter(edits_scDNAseq == "=") %>% filter(str_detect(window, "C")==FALSE) %>% select(window, guide, edits_scDNAseq)
+app_data_seq %>% filter(edits_scDNAseq == "=") %>% filter(str_detect(window, "GC")) %>% select(window, edits_scDNAseq, guide) %>% distinct()
+app_data_seq %>% filter(edits_scDNAseq == "=") %>% filter(str_detect(window, "TTTT")) %>% select(window, edits_scDNAseq, guide) %>% distinct()
+```
+
+```{r}
+# heat map of editing window from scDNA seq
+
+plot1 <- ggplot(subset(sc_seq_data, penetrance != "WT"), aes(x=sgRNA_ID, y= edit_position_scseq, fill = proportions_scDNAseq , alpha = penetrance)) +
+  geom_tile() +
+theme_classic()+
+  ylim(-15, 30) +
+  labs(y="editing position", x ="gRNAs", fill = "proportion of cells") +
+  geom_hline(yintercept = 4, linetype="dotted", colour = "grey65") +
+  geom_hline(yintercept = 9, linetype="dotted", colour = "grey65") +
+    scale_fill_gradient(low = "#56B1F7", high = "#132B43", na.value = NA) +
+  theme(axis.text.x=element_blank())
+plot1
+sc_seq_data
+```
+
+```{r}
+#amplicon seq graph
+amplicon_seq_data_2 <- as_tibble(read.csv("amplicon_seq_data.csv", stringsAsFactors = FALSE, header = TRUE))
+
+
+plot1 <- ggplot(amplicon_seq_data_2, aes(x=editing, y= edit_position_ampseq)) +
+geom_pointdensity(size=3, alpha=0.8) +
+theme_classic()+
+  ylim(-15, 30) +
+  geom_hline(yintercept = 4, linetype="dotted", colour = "grey65") +
+  geom_hline(yintercept = 9, linetype="dotted", colour = "grey65") +
+  labs(y="editing position", x ="editing %", colour = "density")
+plot1
 ```
 
 ```{r}
@@ -1227,6 +1426,7 @@ supp_table_5%>%
 10/(10+114+53) *100
 
 ```
+
 ```{r}
 #overalp between CRC-9 and HT-29
 supp_table_5 
